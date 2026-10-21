@@ -45,7 +45,7 @@ generate-pdf types
 | Flag | Default | Keterangan |
 |---|---|---|
 | `-t/--type` | `invoice` | `invoice`, `surat-resmi`, `laporan`, `kuitansi`, `surat-jalan`, `sertifikat` |
-| `-o/--out` | `<out-dir>/<type>-<seed>.pdf` | path output persis |
+| `-o/--out` | `<out-dir>/<type>_<UTC>_<uuid v7>.pdf` | path output persis |
 | `--out-dir` | `output` | folder dasar output default dan path relatif; dibuat otomatis |
 | `-r/--rows` | per jenis | invoice 8, laporan 70, surat-jalan 25, sisanya 0 (diabaikan) |
 | `-s/--seed` | 42 | `uint64`; 0 berarti acak (determinisme tidak berlaku) |
@@ -68,7 +68,7 @@ Presedensi: **flag > env `GENPDF_*` > file config > default**.
 - `config.Load(cmd)` melakukan penggabungan sumber, default per jenis, dan menghitung `Provided(key) bool` untuk flag/env/file sehingga package `prompt` tidak perlu menyentuh viper.
 - `config.Validate(cfg)` diekspor dan dipanggil dua kali: setelah load, dan setelah prompt (final validation).
 - Tag `validator/v10`: `type` `required,oneof=...`, `rows` `gte=0`, `out` `required`. Pesan menyebut field dan nilai.
-- `out-dir` kosong jatuh ke default `output`; `out` yang tidak diberikan dihitung sebagai `<out-dir>/<type>-<seed>.pdf`.
+- `out-dir` kosong jatuh ke default `output`; `out` yang tidak diberikan dihitung sebagai `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf` (timestamp `YYYYMMDDTHHMMSSZ`, UUID v7 per file).
 
 ## Interaktif
 
@@ -103,8 +103,8 @@ jobs:
 - `jobs` wajib berisi minimal satu entri; field tidak dikenal bukan error.
 - Field job (`type`, `pages`, `seed`, `out`, `title`) menimpa nilai global
   (flag/env/file/default); field kosong mewarisi global. `out` kosong →
-  `<out-dir>/<type>-<index>-<seed>.pdf`, index mulai 1. `out` relatif diselesaikan
-  terhadap `--out-dir`; path absolut dipakai apa adanya.
+  `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf`; UUID dibuat per file. `out`
+  relatif diselesaikan terhadap `--out-dir`; path absolut dipakai apa adanya.
 - `pages` wajib ≥ 1, default 1. `pages` > 1 hanya untuk `invoice`, `laporan`,
   `surat-jalan`; jenis lain wajib 1 halaman.
 - Seluruh daftar job divalidasi sebelum render; satu job tidak valid menggagalkan
@@ -129,6 +129,7 @@ jobs:
 
 - `WithCreationDate(time.Unix(int64(seed), 0).UTC())`.
 - ID dokumen `uuid.NewSHA1(uuid.NameSpaceOID, []byte("<type>-<seed>"))`.
+- Nama file default memakai timestamp generate UTC + UUID v7 sehingga tidak deterministik; path stabil hanya lewat `out` eksplisit. Isi dan metadata tetap deterministik dari seed.
 - Satu instance `gofakeit.New(seed)` yang diteruskan eksplisit; tanpa faker global.
 - Tidak ada `time.Now()` di isi dokumen maupun metadata.
 - Setiap job memakai seed-nya sendiri; job dengan input sama menghasilkan byte identik.
@@ -171,7 +172,7 @@ Zap console encoder ke stderr; `warn` default, `info` dengan `-v`. Satu ringkasa
 | `brianvoe/gofakeit/v7` | data palsu ber-seed |
 | `pdfcpu/pdfcpu` | `report.Verify` + test |
 | `boombuler/barcode` | Code128 di `barcode.go` |
-| `google/uuid` | ID dokumen (`NewSHA1`) |
+| `google/uuid` | ID dokumen (`NewSHA1`) dan nama file default (`NewV7`) |
 | `go-playground/validator/v10` | validasi config |
 | `shopspring/decimal` | uang invoice |
 | `stretchr/testify` | assertion test |

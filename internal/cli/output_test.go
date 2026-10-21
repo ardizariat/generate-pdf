@@ -24,8 +24,9 @@ func TestSingleDefaultLandsInOutputDir(t *testing.T) {
 	_, err := execute(t, "-t", "kuitansi", "--no-input")
 	require.NoError(t, err)
 
-	_, err = os.Stat(filepath.Join("output", "kuitansi-42.pdf"))
+	matches, err := filepath.Glob(filepath.Join("output", "kuitansi_*.pdf"))
 	require.NoError(t, err)
+	require.Len(t, matches, 1)
 }
 
 func TestBatchUsesOutDirForDefaultsAndRelativePaths(t *testing.T) {
@@ -39,11 +40,10 @@ func TestBatchUsesOutDirForDefaultsAndRelativePaths(t *testing.T) {
 	_, err := execute(t, "--batch", batch, "--out-dir", outDir, "--no-input")
 	require.NoError(t, err)
 
-	for _, path := range []string{
-		filepath.Join(outDir, "invoice-1-42.pdf"),
-		filepath.Join(outDir, "nested", "laporan.pdf"),
-	} {
-		_, err := os.Stat(path)
-		require.NoError(t, err, path)
-	}
+	matches, err := filepath.Glob(filepath.Join(outDir, "invoice_*.pdf"))
+	require.NoError(t, err)
+	require.Len(t, matches, 1)
+
+	_, err = os.Stat(filepath.Join(outDir, "nested", "laporan.pdf"))
+	require.NoError(t, err)
 }

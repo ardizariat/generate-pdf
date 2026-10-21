@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,11 @@ func TestLoadBatchResolvesDefaults(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, jobs, 2)
-	assert.Equal(t, Job{Type: TypeReport, Pages: 1, Seed: 42, Out: "laporan-1-42.pdf", Title: "Laporan"}, jobs[0])
+	assert.Equal(t, TypeReport, jobs[0].Type)
+	assert.Equal(t, 1, jobs[0].Pages)
+	assert.Equal(t, uint64(42), jobs[0].Seed)
+	assert.Equal(t, "Laporan", jobs[0].Title)
+	requireDefaultName(t, jobs[0].Out, "", TypeReport)
 	assert.Equal(t, Job{Type: TypeInvoice, Pages: 1, Seed: 42, Out: "custom.pdf", Title: "Invoice"}, jobs[1])
 }
 
@@ -62,7 +67,7 @@ func TestLoadBatchInheritsFlags(t *testing.T) {
 	require.Len(t, jobs, 1)
 	assert.Equal(t, TypeReceipt, jobs[0].Type)
 	assert.Equal(t, uint64(9), jobs[0].Seed)
-	assert.Equal(t, filepath.Join("output", "kuitansi-1-9.pdf"), jobs[0].Out)
+	requireDefaultName(t, jobs[0].Out, "output", TypeReceipt)
 	assert.Equal(t, "Kuitansi", jobs[0].Title)
 }
 
@@ -146,7 +151,7 @@ func TestLoadBatchResolvesOutDir(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, jobs, 3)
 
-	assert.Equal(t, filepath.Join("output", "invoice-1-42.pdf"), jobs[0].Out)
+	requireDefaultName(t, jobs[0].Out, "output", TypeInvoice)
 	assert.Equal(t, filepath.Join("output", "sub", "custom.pdf"), jobs[1].Out)
 	assert.Equal(t, "/abs/custom.pdf", jobs[2].Out)
 }
@@ -156,4 +161,15 @@ func TestOutputPath(t *testing.T) {
 	assert.Equal(t, "", OutputPath("output", ""))
 	assert.Equal(t, "a.pdf", OutputPath("", "a.pdf"))
 	assert.Equal(t, "/abs/a.pdf", OutputPath("output", "/abs/a.pdf"))
+}
+
+func TestDefaultOutputName(t *testing.T) {
+	at := time.Date(2026, 10, 21, 14, 15, 30, 0, time.UTC)
+	name, err := DefaultOutputName(TypeInvoice, at)
+	require.NoError(t, err)
+	assert.Regexp(t, `^invoice_20261021T141530Z_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$`, name)
+
+	other, err := DefaultOutputName(TypeInvoice, at)
+	require.NoError(t, err)
+	assert.NotEqual(t, name, other, "uuid v7 harus unik")
 }

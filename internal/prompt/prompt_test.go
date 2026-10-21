@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"testing"
 
 	"charm.land/huh/v2"
@@ -46,9 +48,18 @@ func TestBuildJobsCyclesTypes(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, jobs, 3)
 
-	assert.Equal(t, config.Job{Type: config.TypeInvoice, Pages: 2, Seed: 42, Out: "output/invoice-1-42.pdf", Title: "Invoice"}, jobs[0])
-	assert.Equal(t, config.Job{Type: config.TypeReport, Pages: 2, Seed: 42, Out: "output/laporan-2-42.pdf", Title: "Laporan"}, jobs[1])
-	assert.Equal(t, config.Job{Type: config.TypeInvoice, Pages: 2, Seed: 42, Out: "output/invoice-3-42.pdf", Title: "Invoice"}, jobs[2])
+	assert.Equal(t, config.TypeInvoice, jobs[0].Type)
+	assert.Equal(t, 2, jobs[0].Pages)
+	assert.Equal(t, uint64(42), jobs[0].Seed)
+	assert.Equal(t, "Invoice", jobs[0].Title)
+	requireDefaultName(t, jobs[0].Out, "output", config.TypeInvoice)
+
+	assert.Equal(t, config.TypeReport, jobs[1].Type)
+	assert.Equal(t, "Laporan", jobs[1].Title)
+	requireDefaultName(t, jobs[1].Out, "output", config.TypeReport)
+
+	assert.Equal(t, config.TypeInvoice, jobs[2].Type)
+	requireDefaultName(t, jobs[2].Out, "output", config.TypeInvoice)
 }
 
 func TestBuildJobsForcesSinglePageWithoutTable(t *testing.T) {
@@ -67,7 +78,7 @@ func TestBuildJobsUsesProvidedTitleAndSeed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Judul Khusus", jobs[0].Title)
 	assert.Equal(t, uint64(9), jobs[0].Seed)
-	assert.Equal(t, "output/kuitansi-1-9.pdf", jobs[0].Out)
+	requireDefaultName(t, jobs[0].Out, "output", config.TypeReceipt)
 }
 
 func TestBuildJobsRejectsEmptySelection(t *testing.T) {
@@ -136,4 +147,14 @@ func TestPipeStdinIsNotInteractive(t *testing.T) {
 	t.Cleanup(func() { os.Stdin = previous })
 
 	assert.False(t, IsInteractive())
+}
+
+// requireDefaultName checks the <type>_<UTC>_<uuid v7>.pdf default name.
+func requireDefaultName(t *testing.T, path, dir, docType string) {
+	t.Helper()
+
+	pattern := "^" + regexp.QuoteMeta(docType) +
+		`_\d{8}T\d{6}Z_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$`
+	assert.Equal(t, dir, filepath.Dir(path))
+	assert.Regexp(t, pattern, filepath.Base(path))
 }

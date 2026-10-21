@@ -25,7 +25,7 @@ pdfgen types         # tampilkan jenis dokumen yang didukung
 ```
 
 Tanpa argumen dan tanpa prompt (mis. stdin bukan terminal, atau dengan `--no-input`),
-`pdfgen` membuat invoice default ke `output/invoice-42.pdf`. Contoh:
+`pdfgen` membuat invoice default ke `output/<type>_<timestamp>_<uuid>.pdf`. Contoh:
 
 ```bash
 pdfgen -t laporan -s 7 --no-input --verify
@@ -53,7 +53,7 @@ lain nilainya diabaikan.
 | Flag | Default | Keterangan |
 |---|---|---|
 | `-t, --type` | `invoice` | Jenis dokumen: `invoice`, `surat-resmi`, `laporan`, `kuitansi`, `surat-jalan`, `sertifikat` |
-| `-o, --out` | `<out-dir>/<type>-<seed>.pdf` | Path output PDF (persis) |
+| `-o, --out` | `<out-dir>/<type>_<UTC>_<uuid v7>.pdf` | Path output PDF (persis) |
 | `--out-dir` | `output` | Folder dasar output default dan path relatif; dibuat otomatis |
 | `-r, --rows` | per jenis (lihat tabel di atas) | Jumlah baris tabel; diabaikan bila jenis tidak bertabel |
 | `-s, --seed` | `42` | Seed data (`uint64`); `0` berarti acak |
@@ -100,7 +100,7 @@ Config divalidasi setelah semua sumber digabung dan sekali lagi setelah prompt:
   Satu form saja: jumlah file, jenis dokumen (multi-select, boleh lebih dari satu), dan
   satu jumlah halaman yang dipakai untuk semua file. Jenis dipakai berurutan secara
   berputar bila file lebih banyak daripada jenis. Path output, seed, dan judul tidak
-  ditanyakan: output otomatis `<out-dir>/<type>-<index>-<seed>.pdf`, seed dari
+  ditanyakan: output otomatis `<out-dir>/<type>_<UTC>_<uuid v7>.pdf`, seed dari
   flag/env/default, judul default per jenis atau `--title`. Tidak ada konfirmasi;
   generate langsung berjalan dan ringkasan dicetak setelahnya. Membatalkan form
   menghasilkan error `input dibatalkan` dan exit code `1`.
@@ -125,8 +125,9 @@ jobs:
 
 - Field job (`type`, `pages`, `seed`, `out`, `title`) menimpa nilai global; field yang
   kosong mewarisi flag/env/file/default. `out` kosong menjadi
-  `<out-dir>/<type>-<index>-<seed>.pdf` dengan index mulai 1. `out` relatif
-  diselesaikan terhadap `--out-dir`; path absolut dipakai apa adanya.
+  `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf` (timestamp `YYYYMMDDTHHMMSSZ`,
+  UUID dibuat per file). `out` relatif diselesaikan terhadap `--out-dir`; path
+  absolut dipakai apa adanya.
 - `pages` default `1` dan harus tepat. Isi tabel diisi semaksimal mungkin untuk jumlah
   halaman itu; jumlah halaman akhir dihitung pdfcpu dan target yang tidak tercapai
   menggagalkan job tersebut.
@@ -145,8 +146,9 @@ jobs:
 
 ## Perilaku output
 
-- Nama default `<out-dir>/<type>-<seed>.pdf`; pada batch
-  `<out-dir>/<type>-<index>-<seed>.pdf`. `--out-dir` default `output`.
+- Nama default `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf`, mis.
+  `output/invoice_20261021T141530Z_0192f3a4-....pdf`. `--out-dir` default `output`.
+  Timestamp memakai `YYYYMMDDTHHMMSSZ`; UUID v7 dibuat per file.
 - `--out` menang atas `--out-dir` untuk nama file; isinya dipakai persis, termasuk
   path absolut.
 - Folder output dibuat otomatis (`MkdirAll`), termasuk folder induk dari `--out` atau
@@ -163,7 +165,8 @@ jobs:
 ## Determinisme
 
 - Seed, jenis, jumlah baris, dan judul yang sama menghasilkan PDF dengan isi dan
-  metadata identik. Tanggal dokumen diturunkan dari seed
+  metadata identik. Nama file **tidak** deterministik karena memakai timestamp dan
+  UUID v7; pakai `--out`/`out` untuk path yang dapat diprediksi. Tanggal dokumen diturunkan dari seed
   (`time.Unix(seed, 0).UTC()`) dan ID dokumen adalah UUID v5 dari `<type>-<seed>`.
   Pada batch, setiap job memakai seed-nya sendiri.
 - `--seed 0` berarti data acak; output tidak deterministik.

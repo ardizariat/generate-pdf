@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -48,7 +49,7 @@ func LoadBatch(path string, base Config) ([]Job, error) {
 	}
 
 	jobs := make([]Job, 0, len(m.Jobs))
-	for i, entry := range m.Jobs {
+	for _, entry := range m.Jobs {
 		job := Job{
 			Type:  entry.Type,
 			Pages: 1,
@@ -70,7 +71,11 @@ func LoadBatch(path string, base Config) ([]Job, error) {
 		}
 		job.Out = OutputPath(base.OutDir, job.Out)
 		if job.Out == "" {
-			job.Out = OutputPath(base.OutDir, fmt.Sprintf("%s-%d-%d.pdf", job.Type, i+1, job.Seed))
+			name, err := DefaultOutputName(job.Type, time.Now())
+			if err != nil {
+				return nil, fmt.Errorf("manifest %s: %w", path, err)
+			}
+			job.Out = OutputPath(base.OutDir, name)
 		}
 		jobs = append(jobs, job)
 	}

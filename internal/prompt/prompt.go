@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"charm.land/huh/v2"
 
@@ -93,11 +94,15 @@ func buildJobs(base config.Config, types []string, files int, pages int) ([]conf
 		if !config.SupportsMultiPage(docType) {
 			pageCount = 1
 		}
+		name, err := config.DefaultOutputName(docType, time.Now())
+		if err != nil {
+			return nil, err
+		}
 		jobs = append(jobs, config.Job{
 			Type:  docType,
 			Pages: pageCount,
 			Seed:  base.Seed,
-			Out:   config.OutputPath(base.OutDir, fmt.Sprintf("%s-%d-%d.pdf", docType, i+1, base.Seed)),
+			Out:   config.OutputPath(base.OutDir, name),
 			Title: title,
 		})
 	}

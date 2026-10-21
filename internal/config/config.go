@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -65,6 +67,16 @@ func OutputPath(baseDir, path string) string {
 		return path
 	}
 	return filepath.Join(baseDir, path)
+}
+
+// DefaultOutputName builds a unique default name:
+// <type>_<UTC timestamp>_<uuid v7>.pdf.
+func DefaultOutputName(docType string, at time.Time) (string, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return "", fmt.Errorf("buat uuid output: %w", err)
+	}
+	return fmt.Sprintf("%s_%s_%s.pdf", docType, at.UTC().Format("20060102T150405Z"), id.String()), nil
 }
 
 // Config is the final configuration after all sources are merged.
@@ -144,7 +156,11 @@ func Load(cmd *cobra.Command) (Config, error) {
 		loose.Title = defaults.title
 	}
 	if !loose.Provided("out") {
-		loose.Out = OutputPath(loose.OutDir, fmt.Sprintf("%s-%d.pdf", loose.Type, loose.Seed))
+		name, err := DefaultOutputName(loose.Type, time.Now())
+		if err != nil {
+			return Config{}, err
+		}
+		loose.Out = OutputPath(loose.OutDir, name)
 	}
 
 	return loose, nil

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -51,7 +52,7 @@ func TestLoadDefaults(t *testing.T) {
 	assert.Equal(t, TypeInvoice, cfg.Type)
 	assert.Equal(t, 8, cfg.Rows)
 	assert.Equal(t, "Invoice", cfg.Title)
-	assert.Equal(t, "output/invoice-42.pdf", cfg.Out)
+	requireDefaultName(t, cfg.Out, "output", TypeInvoice)
 	assert.Equal(t, DefaultOutDir, cfg.OutDir)
 	assert.Equal(t, uint64(42), cfg.Seed)
 	assert.Empty(t, cfg.ConfigPath)
@@ -62,7 +63,7 @@ func TestLoadOutDir(t *testing.T) {
 
 	cfg, err := Load(newCommand(t, "--out-dir", "hasil"))
 	require.NoError(t, err)
-	assert.Equal(t, "hasil/invoice-42.pdf", cfg.Out)
+	requireDefaultName(t, cfg.Out, "hasil", TypeInvoice)
 
 	cfg, err = Load(newCommand(t, "--out", "custom.pdf", "--out-dir", "hasil"))
 	require.NoError(t, err)
@@ -87,7 +88,6 @@ func TestLoadPrecedence(t *testing.T) {
 			name:     "default",
 			wantType: TypeInvoice,
 			wantRows: 8,
-			wantOut:  "output/invoice-42.pdf",
 		},
 		{
 			name:     "file over default",
@@ -130,7 +130,11 @@ func TestLoadPrecedence(t *testing.T) {
 
 			assert.Equal(t, tc.wantType, cfg.Type)
 			assert.Equal(t, tc.wantRows, cfg.Rows)
-			assert.Equal(t, tc.wantOut, cfg.Out)
+			if tc.wantOut == "" {
+				requireDefaultName(t, cfg.Out, "output", cfg.Type)
+			} else {
+				assert.Equal(t, tc.wantOut, cfg.Out)
+			}
 		})
 	}
 }
@@ -158,7 +162,7 @@ func TestLoadDefaultsPerType(t *testing.T) {
 
 			assert.Equal(t, tc.wantRows, cfg.Rows)
 			assert.Equal(t, tc.wantTitle, cfg.Title)
-			assert.Equal(t, filepath.Join("output", tc.typ+"-7.pdf"), cfg.Out)
+			requireDefaultName(t, cfg.Out, "output", tc.typ)
 		})
 	}
 }
@@ -286,4 +290,17 @@ func TestValidateAcceptsEveryType(t *testing.T) {
 	for _, typ := range Types() {
 		assert.NoError(t, Validate(Config{Type: typ, Out: typ + "-42.pdf"}), typ)
 	}
+}
+
+// requireDefaultName checks the <type>_<UTC>_<uuid v7>.pdf default name.
+func requireDefaultName(t *testing.T, path, dir, docType string) {
+	t.Helper()
+
+	pattern := "^" + regexp.QuoteMeta(docType) +
+		`_\d{8}T\d{6}Z_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$`
+	if dir == "" {
+		dir = "."
+	}
+	assert.Equal(t, dir, filepath.Dir(path))
+	assert.Regexp(t, pattern, filepath.Base(path))
 }
