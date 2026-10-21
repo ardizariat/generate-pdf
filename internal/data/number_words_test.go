@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTerbilang(t *testing.T) {
+func TestNumberWords(t *testing.T) {
 	tests := []struct {
 		n    int64
 		want string
@@ -26,13 +26,13 @@ func TestTerbilang(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.want, func(t *testing.T) {
-			assert.Equal(t, tc.want, Terbilang(tc.n))
+			assert.Equal(t, tc.want, NumberWords(tc.n))
 		})
 	}
 }
 
-func TestTerbilangWithoutDigitsOrDoubleSpaces(t *testing.T) {
-	got := Terbilang(12_345_678)
+func TestNumberWordsWithoutDigitsOrDoubleSpaces(t *testing.T) {
+	got := NumberWords(12_345_678)
 	assert.NotContains(t, got, "  ")
 	assert.False(t, strings.ContainsAny(got, "0123456789"), got)
 }
