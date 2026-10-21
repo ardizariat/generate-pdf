@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -59,6 +60,10 @@ func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
 		return fmt.Errorf("cek %s: %w", cfg.Out, err)
 	}
 
+	if err := ensureParentDir(cfg.Out); err != nil {
+		return err
+	}
+
 	start := time.Now()
 
 	var pages int
@@ -89,5 +94,18 @@ func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
 		zap.Int64("bytes", size),
 		zap.Duration("duration", time.Since(start)),
 	)
+	return nil
+}
+
+// ensureParentDir creates the output directory tree so a fresh checkout can
+// generate into output/ without a manual mkdir.
+func ensureParentDir(path string) error {
+	dir := filepath.Dir(path)
+	if dir == "." || dir == "" {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("buat direktori %s: %w", dir, err)
+	}
 	return nil
 }

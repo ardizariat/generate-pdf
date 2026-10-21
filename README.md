@@ -25,12 +25,13 @@ pdfgen types         # tampilkan jenis dokumen yang didukung
 ```
 
 Tanpa argumen dan tanpa prompt (mis. stdin bukan terminal, atau dengan `--no-input`),
-`pdfgen` membuat invoice default ke `invoice-42.pdf`. Contoh:
+`pdfgen` membuat invoice default ke `output/invoice-42.pdf`. Contoh:
 
 ```bash
 pdfgen -t laporan -s 7 --no-input --verify
 pdfgen -t kuitansi --out /tmp/opencode/kuitansi.pdf --force -v
 pdfgen -t sertifikat --title "Sertifikat Pelatihan" --no-input
+pdfgen -t laporan --out-dir hasil --no-input
 ```
 
 ## Jenis dokumen
@@ -52,7 +53,8 @@ lain nilainya diabaikan.
 | Flag | Default | Keterangan |
 |---|---|---|
 | `-t, --type` | `invoice` | Jenis dokumen: `invoice`, `surat-resmi`, `laporan`, `kuitansi`, `surat-jalan`, `sertifikat` |
-| `-o, --out` | `<type>-<seed>.pdf` | Path output PDF |
+| `-o, --out` | `<out-dir>/<type>-<seed>.pdf` | Path output PDF (persis) |
+| `--out-dir` | `output` | Folder dasar output default dan path relatif; dibuat otomatis |
 | `-r, --rows` | per jenis (lihat tabel di atas) | Jumlah baris tabel; diabaikan bila jenis tidak bertabel |
 | `-s, --seed` | `42` | Seed data (`uint64`); `0` berarti acak |
 | `--title` | per jenis | Judul dokumen |
@@ -85,8 +87,8 @@ File konfigurasi bersifat opsional; bila tidak ada, bukan error. Aplikasi tidak 
 menulis file konfigurasi. Nama key sama dengan nama flag.
 
 Environment variable memakai prefix `GENPDF_` dengan `-` diganti `_`:
-`GENPDF_TYPE`, `GENPDF_OUT`, `GENPDF_ROWS`, `GENPDF_SEED`, `GENPDF_TITLE`,
-`GENPDF_BATCH`, `GENPDF_NO_INPUT`, `GENPDF_FORCE`, `GENPDF_VERIFY`,
+`GENPDF_TYPE`, `GENPDF_OUT`, `GENPDF_OUT_DIR`, `GENPDF_ROWS`, `GENPDF_SEED`,
+`GENPDF_TITLE`, `GENPDF_BATCH`, `GENPDF_NO_INPUT`, `GENPDF_FORCE`, `GENPDF_VERIFY`,
 `GENPDF_VERBOSE`, `GENPDF_CONFIG`.
 
 Config divalidasi setelah semua sumber digabung dan sekali lagi setelah prompt:
@@ -98,10 +100,10 @@ Config divalidasi setelah semua sumber digabung dan sekali lagi setelah prompt:
   Satu form saja: jumlah file, jenis dokumen (multi-select, boleh lebih dari satu), dan
   satu jumlah halaman yang dipakai untuk semua file. Jenis dipakai berurutan secara
   berputar bila file lebih banyak daripada jenis. Path output, seed, dan judul tidak
-  ditanyakan: output otomatis `<type>-<index>-<seed>.pdf`, seed dari flag/env/default,
-  judul default per jenis atau `--title`. Tidak ada konfirmasi; generate langsung
-  berjalan dan ringkasan dicetak setelahnya. Membatalkan form menghasilkan error
-  `input dibatalkan` dan exit code `1`.
+  ditanyakan: output otomatis `<out-dir>/<type>-<index>-<seed>.pdf`, seed dari
+  flag/env/default, judul default per jenis atau `--title`. Tidak ada konfirmasi;
+  generate langsung berjalan dan ringkasan dicetak setelahnya. Membatalkan form
+  menghasilkan error `input dibatalkan` dan exit code `1`.
 - **Noninteraktif** berlaku bila `--no-input` diberikan, stdin bukan terminal, atau
   `--batch` digunakan. Semua nilai diambil dari flag, env, file konfigurasi, atau
   default; tidak ada pertanyaan dan tidak ada pembacaan stdin.
@@ -123,7 +125,8 @@ jobs:
 
 - Field job (`type`, `pages`, `seed`, `out`, `title`) menimpa nilai global; field yang
   kosong mewarisi flag/env/file/default. `out` kosong menjadi
-  `<type>-<index>-<seed>.pdf` dengan index mulai 1.
+  `<out-dir>/<type>-<index>-<seed>.pdf` dengan index mulai 1. `out` relatif
+  diselesaikan terhadap `--out-dir`; path absolut dipakai apa adanya.
 - `pages` default `1` dan harus tepat. Isi tabel diisi semaksimal mungkin untuk jumlah
   halaman itu; jumlah halaman akhir dihitung pdfcpu dan target yang tidak tercapai
   menggagalkan job tersebut.
@@ -142,13 +145,16 @@ jobs:
 
 ## Perilaku output
 
-- Nama default `<type>-<seed>.pdf` di direktori kerja; pada batch
-  `<type>-<index>-<seed>.pdf`.
+- Nama default `<out-dir>/<type>-<seed>.pdf`; pada batch
+  `<out-dir>/<type>-<index>-<seed>.pdf`. `--out-dir` default `output`.
+- `--out` menang atas `--out-dir` untuk nama file; isinya dipakai persis, termasuk
+  path absolut.
+- Folder output dibuat otomatis (`MkdirAll`), termasuk folder induk dari `--out` atau
+  `out` relatif di manifest. Error hanya bila path ada tapi bukan direktori atau gagal
+  dibuat.
 - Bila file tujuan sudah ada, generate **ditolak** dengan error yang menyebut path dan
   cara mengizinkannya. `--force` mengizinkan penimpaan. Pada batch, hanya job itu yang
   gagal dan job lain tetap berjalan.
-- Direktori tujuan harus sudah ada; direktori yang tidak ada menghasilkan error, bukan
-  panic.
 - `--verify` memvalidasi hasil dengan pdfcpu setelah file ditulis; verifikasi gagal
   berarti generate gagal. Jumlah halaman selalu dihitung (lewat pdfcpu) sebagai bagian
   dari proses generate, terlepas dari `--verify`.

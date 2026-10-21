@@ -70,6 +70,10 @@ func generateJob(job config.Job, cfg config.Config) (pages int, size int64, err 
 		return 0, 0, fmt.Errorf("cek %s: %w", job.Out, err)
 	}
 
+	if err := ensureParentDir(job.Out); err != nil {
+		return 0, 0, err
+	}
+
 	build := func(rows int) (data.Report, error) {
 		r, err := data.Generate(job.Type, rows, job.Seed)
 		if err != nil {

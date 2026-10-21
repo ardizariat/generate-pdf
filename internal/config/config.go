@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -31,8 +32,11 @@ const (
 	configName = "generate-pdf"
 )
 
+// DefaultOutDir is where generated PDFs go when no path is given.
+const DefaultOutDir = "output"
+
 // configKeys is read-only: viper key = flag name.
-var configKeys = [...]string{"type", "out", "rows", "seed", "title", "batch", "no-input", "force", "verify", "verbose", "config"}
+var configKeys = [...]string{"type", "out", "out-dir", "rows", "seed", "title", "batch", "no-input", "force", "verify", "verbose", "config"}
 
 type defaults struct {
 	rows  int
@@ -54,10 +58,20 @@ func Types() []string {
 	return strings.Split(typeList, ",")
 }
 
+// OutputPath places a relative path under baseDir. Absolute paths and an empty
+// baseDir are returned unchanged.
+func OutputPath(baseDir, path string) string {
+	if path == "" || baseDir == "" || filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(baseDir, path)
+}
+
 // Config is the final configuration after all sources are merged.
 type Config struct {
 	Type       string `validate:"required,oneof=invoice surat-resmi laporan kuitansi surat-jalan sertifikat"`
 	Out        string `validate:"required"`
+	OutDir     string
 	Title      string
 	Batch      string
 	Rows       int `validate:"gte=0"`
@@ -102,6 +116,7 @@ func Load(cmd *cobra.Command) (Config, error) {
 	loose := Config{
 		Type:       v.GetString("type"),
 		Out:        v.GetString("out"),
+		OutDir:     v.GetString("out-dir"),
 		Title:      v.GetString("title"),
 		Batch:      v.GetString("batch"),
 		Rows:       v.GetInt("rows"),
@@ -117,6 +132,9 @@ func Load(cmd *cobra.Command) (Config, error) {
 	if loose.Type == "" {
 		loose.Type = TypeInvoice
 	}
+	if loose.OutDir == "" {
+		loose.OutDir = DefaultOutDir
+	}
 
 	defaults := typeDefaults[loose.Type]
 	if !loose.Provided("rows") {
@@ -126,7 +144,7 @@ func Load(cmd *cobra.Command) (Config, error) {
 		loose.Title = defaults.title
 	}
 	if !loose.Provided("out") {
-		loose.Out = fmt.Sprintf("%s-%d.pdf", loose.Type, loose.Seed)
+		loose.Out = OutputPath(loose.OutDir, fmt.Sprintf("%s-%d.pdf", loose.Type, loose.Seed))
 	}
 
 	return loose, nil

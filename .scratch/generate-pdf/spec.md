@@ -45,7 +45,8 @@ generate-pdf types
 | Flag | Default | Keterangan |
 |---|---|---|
 | `-t/--type` | `invoice` | `invoice`, `surat-resmi`, `laporan`, `kuitansi`, `surat-jalan`, `sertifikat` |
-| `-o/--out` | `<type>-<seed>.pdf` | path output |
+| `-o/--out` | `<out-dir>/<type>-<seed>.pdf` | path output persis |
+| `--out-dir` | `output` | folder dasar output default dan path relatif; dibuat otomatis |
 | `-r/--rows` | per jenis | invoice 8, laporan 70, surat-jalan 25, sisanya 0 (diabaikan) |
 | `-s/--seed` | 42 | `uint64`; 0 berarti acak (determinisme tidak berlaku) |
 | `--title` | per jenis | judul dokumen |
@@ -63,10 +64,11 @@ Exit code: `0` sukses, `1` kegagalan apa pun. Hanya `main.go` yang memanggil `os
 Presedensi: **flag > env `GENPDF_*` > file config > default**.
 
 - File: `--config`, atau `generate-pdf.yaml` di cwd; tidak ada bukan error; tidak pernah ditulis.
-- Env prefix `GENPDF_`, `-` → `_`. Semua key flag dapat datang dari env/file, termasuk `batch`.
+- Env prefix `GENPDF_`, `-` → `_`. Semua key flag dapat datang dari env/file, termasuk `batch` dan `out-dir`.
 - `config.Load(cmd)` melakukan penggabungan sumber, default per jenis, dan menghitung `Provided(key) bool` untuk flag/env/file sehingga package `prompt` tidak perlu menyentuh viper.
 - `config.Validate(cfg)` diekspor dan dipanggil dua kali: setelah load, dan setelah prompt (final validation).
 - Tag `validator/v10`: `type` `required,oneof=...`, `rows` `gte=0`, `out` `required`. Pesan menyebut field dan nilai.
+- `out-dir` kosong jatuh ke default `output`; `out` yang tidak diberikan dihitung sebagai `<out-dir>/<type>-<seed>.pdf`.
 
 ## Interaktif
 
@@ -78,9 +80,9 @@ Aktif bila stdin character device dan `--no-input` false. `huh/v2`, satu form:
 
 Jenis dipakai berputar sesuai urutan pilihan bila file lebih banyak daripada jenis.
 Jenis tanpa tabel selalu 1 halaman. Output, seed, dan judul tidak ditanyakan: output
-`<type>-<index>-<seed>.pdf`, seed dari flag/env/default, judul default per jenis atau
+`<out-dir>/<type>-<index>-<seed>.pdf`, seed dari flag/env/default, judul default per jenis atau
 `--title`. Tidak ada konfirmasi; setelah form selesai batch langsung dijalankan.
-`--rows` dan `--out` tidak dipakai pada mode interaktif. Pembatalan pengguna
+`--rows` dan `--out` tidak dipakai pada mode interaktif; lokasi diatur `--out-dir`. Pembatalan pengguna
 dikembalikan sebagai error eksplisit ("dibatalkan"), bukan panic.
 
 ## Batch dan target halaman
@@ -101,7 +103,8 @@ jobs:
 - `jobs` wajib berisi minimal satu entri; field tidak dikenal bukan error.
 - Field job (`type`, `pages`, `seed`, `out`, `title`) menimpa nilai global
   (flag/env/file/default); field kosong mewarisi global. `out` kosong →
-  `<type>-<index>-<seed>.pdf`, index mulai 1.
+  `<out-dir>/<type>-<index>-<seed>.pdf`, index mulai 1. `out` relatif diselesaikan
+  terhadap `--out-dir`; path absolut dipakai apa adanya.
 - `pages` wajib ≥ 1, default 1. `pages` > 1 hanya untuk `invoice`, `laporan`,
   `surat-jalan`; jenis lain wajib 1 halaman.
 - Seluruh daftar job divalidasi sebelum render; satu job tidak valid menggagalkan
@@ -118,7 +121,7 @@ jobs:
 ## Perilaku output
 
 - `os.Stat` pada path: jika file ada dan `--force` false → error yang menyebut path dan cara mengizinkannya.
-- Direktori tujuan tidak ada → error jelas, bukan panic.
+- Folder output (`--out-dir` dan folder induk path output) dibuat otomatis dengan `MkdirAll`; error hanya bila path ada tapi bukan direktori atau gagal dibuat.
 - `report.Generate` menulis file lalu, bila `--verify`, memvalidasi dengan pdfcpu; hanya setelah itu generate dinyatakan berhasil.
 - Progress ditulis ke stderr: spinner `[2/3] file.pdf · target 2 halaman` bila stdin dan stderr terminal; bila bukan terminal, satu baris teks. `-v` mematikan progress karena log zap sudah menampilkan tahapan. stdout hanya berisi ringkasan hasil.
 

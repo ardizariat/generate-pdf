@@ -23,6 +23,7 @@ func loadConfig(t *testing.T, args ...string) config.Config {
 	flags := cmd.Flags()
 	flags.StringP("type", "t", config.TypeInvoice, "")
 	flags.StringP("out", "o", "", "")
+	flags.String("out-dir", config.DefaultOutDir, "")
 	flags.IntP("rows", "r", 0, "")
 	flags.Uint64P("seed", "s", 42, "")
 	flags.String("title", "", "")
@@ -45,9 +46,9 @@ func TestBuildJobsCyclesTypes(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, jobs, 3)
 
-	assert.Equal(t, config.Job{Type: config.TypeInvoice, Pages: 2, Seed: 42, Out: "invoice-1-42.pdf", Title: "Invoice"}, jobs[0])
-	assert.Equal(t, config.Job{Type: config.TypeReport, Pages: 2, Seed: 42, Out: "laporan-2-42.pdf", Title: "Laporan"}, jobs[1])
-	assert.Equal(t, config.Job{Type: config.TypeInvoice, Pages: 2, Seed: 42, Out: "invoice-3-42.pdf", Title: "Invoice"}, jobs[2])
+	assert.Equal(t, config.Job{Type: config.TypeInvoice, Pages: 2, Seed: 42, Out: "output/invoice-1-42.pdf", Title: "Invoice"}, jobs[0])
+	assert.Equal(t, config.Job{Type: config.TypeReport, Pages: 2, Seed: 42, Out: "output/laporan-2-42.pdf", Title: "Laporan"}, jobs[1])
+	assert.Equal(t, config.Job{Type: config.TypeInvoice, Pages: 2, Seed: 42, Out: "output/invoice-3-42.pdf", Title: "Invoice"}, jobs[2])
 }
 
 func TestBuildJobsForcesSinglePageWithoutTable(t *testing.T) {
@@ -66,7 +67,7 @@ func TestBuildJobsUsesProvidedTitleAndSeed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Judul Khusus", jobs[0].Title)
 	assert.Equal(t, uint64(9), jobs[0].Seed)
-	assert.Equal(t, "kuitansi-1-9.pdf", jobs[0].Out)
+	assert.Equal(t, "output/kuitansi-1-9.pdf", jobs[0].Out)
 }
 
 func TestBuildJobsRejectsEmptySelection(t *testing.T) {

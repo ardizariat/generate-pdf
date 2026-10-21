@@ -97,7 +97,7 @@ func buildJobs(base config.Config, types []string, files int, pages int) ([]conf
 			Type:  docType,
 			Pages: pageCount,
 			Seed:  base.Seed,
-			Out:   fmt.Sprintf("%s-%d-%d.pdf", docType, i+1, base.Seed),
+			Out:   config.OutputPath(base.OutDir, fmt.Sprintf("%s-%d-%d.pdf", docType, i+1, base.Seed)),
 			Title: title,
 		})
 	}

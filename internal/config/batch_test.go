@@ -62,7 +62,7 @@ func TestLoadBatchInheritsFlags(t *testing.T) {
 	require.Len(t, jobs, 1)
 	assert.Equal(t, TypeReceipt, jobs[0].Type)
 	assert.Equal(t, uint64(9), jobs[0].Seed)
-	assert.Equal(t, "kuitansi-1-9.pdf", jobs[0].Out)
+	assert.Equal(t, filepath.Join("output", "kuitansi-1-9.pdf"), jobs[0].Out)
 	assert.Equal(t, "Kuitansi", jobs[0].Title)
 }
 
@@ -130,4 +130,30 @@ func TestSupportsMultiPage(t *testing.T) {
 	for _, docType := range []string{TypeLetter, TypeReceipt, TypeCertificate} {
 		assert.False(t, SupportsMultiPage(docType), docType)
 	}
+}
+
+func TestLoadBatchResolvesOutDir(t *testing.T) {
+	path := writeManifest(t, `jobs:
+  - type: invoice
+  - type: invoice
+    out: sub/custom.pdf
+  - type: invoice
+    out: /abs/custom.pdf
+`)
+
+	base := Config{Type: TypeInvoice, Seed: 42, OutDir: "output"}
+	jobs, err := LoadBatch(path, base)
+	require.NoError(t, err)
+	require.Len(t, jobs, 3)
+
+	assert.Equal(t, filepath.Join("output", "invoice-1-42.pdf"), jobs[0].Out)
+	assert.Equal(t, filepath.Join("output", "sub", "custom.pdf"), jobs[1].Out)
+	assert.Equal(t, "/abs/custom.pdf", jobs[2].Out)
+}
+
+func TestOutputPath(t *testing.T) {
+	assert.Equal(t, "output/a.pdf", OutputPath("output", "a.pdf"))
+	assert.Equal(t, "", OutputPath("output", ""))
+	assert.Equal(t, "a.pdf", OutputPath("", "a.pdf"))
+	assert.Equal(t, "/abs/a.pdf", OutputPath("output", "/abs/a.pdf"))
 }

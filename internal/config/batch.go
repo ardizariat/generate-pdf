@@ -68,8 +68,9 @@ func LoadBatch(path string, base Config) ([]Job, error) {
 		if job.Title == "" {
 			job.Title = typeDefaults[job.Type].title
 		}
+		job.Out = OutputPath(base.OutDir, job.Out)
 		if job.Out == "" {
-			job.Out = fmt.Sprintf("%s-%d-%d.pdf", job.Type, i+1, job.Seed)
+			job.Out = OutputPath(base.OutDir, fmt.Sprintf("%s-%d-%d.pdf", job.Type, i+1, job.Seed))
 		}
 		jobs = append(jobs, job)
 	}

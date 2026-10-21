@@ -39,7 +39,8 @@ func New(logger *zap.Logger) *cobra.Command {
 	}
 
 	cmd.Flags().StringP("type", "t", config.TypeInvoice, "jenis dokumen: invoice, surat-resmi, laporan, kuitansi, surat-jalan, sertifikat")
-	cmd.Flags().StringP("out", "o", "", "path output PDF (default <type>-<seed>.pdf)")
+	cmd.Flags().StringP("out", "o", "", "path output PDF (default <out-dir>/<type>-<seed>.pdf)")
+	cmd.Flags().String("out-dir", config.DefaultOutDir, "folder dasar output; dibuat otomatis bila belum ada")
 	cmd.Flags().IntP("rows", "r", defaultRows, "jumlah baris tabel (-1 = default per jenis)")
 	cmd.Flags().Uint64P("seed", "s", defaultSeed, "seed data; 0 berarti acak")
 	cmd.Flags().String("title", "", "judul dokumen (default per jenis)")

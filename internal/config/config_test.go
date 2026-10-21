@@ -23,6 +23,7 @@ func newCommand(t *testing.T, args ...string) *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringP("type", "t", TypeInvoice, "")
 	flags.StringP("out", "o", "", "")
+	flags.String("out-dir", DefaultOutDir, "")
 	flags.IntP("rows", "r", 0, "")
 	flags.Uint64P("seed", "s", 42, "")
 	flags.String("title", "", "")
@@ -50,9 +51,26 @@ func TestLoadDefaults(t *testing.T) {
 	assert.Equal(t, TypeInvoice, cfg.Type)
 	assert.Equal(t, 8, cfg.Rows)
 	assert.Equal(t, "Invoice", cfg.Title)
-	assert.Equal(t, "invoice-42.pdf", cfg.Out)
+	assert.Equal(t, "output/invoice-42.pdf", cfg.Out)
+	assert.Equal(t, DefaultOutDir, cfg.OutDir)
 	assert.Equal(t, uint64(42), cfg.Seed)
 	assert.Empty(t, cfg.ConfigPath)
+}
+
+func TestLoadOutDir(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	cfg, err := Load(newCommand(t, "--out-dir", "hasil"))
+	require.NoError(t, err)
+	assert.Equal(t, "hasil/invoice-42.pdf", cfg.Out)
+
+	cfg, err = Load(newCommand(t, "--out", "custom.pdf", "--out-dir", "hasil"))
+	require.NoError(t, err)
+	assert.Equal(t, "custom.pdf", cfg.Out)
+
+	cfg, err = Load(newCommand(t, "--out", "hasil/custom.pdf"))
+	require.NoError(t, err)
+	assert.Equal(t, "hasil/custom.pdf", cfg.Out)
 }
 
 func TestLoadPrecedence(t *testing.T) {
@@ -69,7 +87,7 @@ func TestLoadPrecedence(t *testing.T) {
 			name:     "default",
 			wantType: TypeInvoice,
 			wantRows: 8,
-			wantOut:  "invoice-42.pdf",
+			wantOut:  "output/invoice-42.pdf",
 		},
 		{
 			name:     "file over default",
@@ -140,7 +158,7 @@ func TestLoadDefaultsPerType(t *testing.T) {
 
 			assert.Equal(t, tc.wantRows, cfg.Rows)
 			assert.Equal(t, tc.wantTitle, cfg.Title)
-			assert.Equal(t, tc.typ+"-7.pdf", cfg.Out)
+			assert.Equal(t, filepath.Join("output", tc.typ+"-7.pdf"), cfg.Out)
 		})
 	}
 }
