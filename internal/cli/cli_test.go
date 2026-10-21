@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -30,12 +31,22 @@ func execute(t *testing.T, args ...string) (string, error) {
 	return out.String(), err
 }
 
+// ansiEscape strips the styling lipgloss adds to `types` output.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
 func TestTypesListsAllDocumentTypes(t *testing.T) {
 	out, err := execute(t, "types")
 	require.NoError(t, err)
 
+	var listed []string
+	for _, line := range strings.Split(strings.TrimSpace(ansiEscape.ReplaceAllString(out, "")), "\n") {
+		fields := strings.Fields(line)
+		require.NotEmpty(t, fields, "baris tanpa slug: %q", line)
+		listed = append(listed, fields[0])
+	}
+
+	assert.Equal(t, config.Types(), listed, "urutan dan isi harus sama dengan config.Types()")
 	for _, docType := range config.Types() {
-		assert.Contains(t, out, docType)
 		assert.Contains(t, out, typeDescriptions[docType])
 	}
 }

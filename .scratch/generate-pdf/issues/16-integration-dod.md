@@ -37,3 +37,10 @@ ls -l /tmp/opencode/pdfcheck
 ## Out of scope
 
 Fitur baru, refactor kosmetik, perubahan perilaku flag.
+
+## Comments
+
+- Selesai. Test baru: `internal/cli/integration_test.go` (tabel lintas jenis lewat CLI penuh, determinisme invoice+laporan), `internal/cli/deps_test.go` (audit dependency non-test + `go mod tidy -diff`), `internal/report/cross_type_test.go` (dispatch/simpan/verify enam jenis). `TestTypesListsAllDocumentTypes` kini membandingkan slug persis dengan `config.Types()`.
+- Verifikasi: `gofmt -w .`, `go vet ./...`, `go test ./... -count=1` (121 tes), `go test -race ./... -count=1` (121 tes), `golangci-lint run` 0 issue, `go mod tidy` idempoten (hash `go.mod`/`go.sum` sama pada run kedua).
+- Enam jenis di-generate ke `/tmp/opencode/pdfcheck` dengan `--no-input --verify -v`: invoice 1, surat-resmi 1, laporan 3, kuitansi 1, surat-jalan 1, sertifikat 1 halaman; semua lolos validasi pdfcpu.
+
