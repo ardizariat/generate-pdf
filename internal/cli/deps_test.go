@@ -3,6 +3,7 @@ package cli
 import (
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -72,6 +73,9 @@ func TestSpecDependenciesAreImported(t *testing.T) {
 // TestGoModTidyIsIdempotent runs tidy in diff mode, which fails when the module
 // files are not already tidy and never rewrites them.
 func TestGoModTidyIsIdempotent(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("go mod tidy -diff runs in the Linux CI job")
+	}
 	out, err := runGo(t, "mod", "tidy", "-diff")
 	require.NoError(t, err, out)
 }
