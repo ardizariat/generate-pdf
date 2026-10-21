@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/ardizariat/generate-pdf/internal/config"
 )
@@ -87,4 +89,26 @@ func TestGenerateWithVerify(t *testing.T) {
 	header, err := os.ReadFile(out)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(string(header), "%PDF-"))
+}
+
+func TestVerboseSelectsInfoLogger(t *testing.T) {
+	core, logs := observer.New(zapcore.DebugLevel)
+	sawVerbose := false
+
+	original := newLogger
+	newLogger = func(verbose bool) *zap.Logger {
+		sawVerbose = verbose
+		return zap.New(core)
+	}
+	t.Cleanup(func() { newLogger = original })
+
+	out := filepath.Join(t.TempDir(), "invoice.pdf")
+	_, err := execute(t, "-t", "invoice", "-o", out, "--no-input", "-v")
+	require.NoError(t, err)
+
+	assert.True(t, sawVerbose)
+	entries := logs.All()
+	require.Len(t, entries, 1)
+	assert.Equal(t, zapcore.InfoLevel, entries[0].Level)
+	assert.Equal(t, "generate selesai", entries[0].Message)
 }

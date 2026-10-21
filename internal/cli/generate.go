@@ -11,9 +11,13 @@ import (
 
 	"github.com/ardizariat/generate-pdf/internal/config"
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/logging"
 	"github.com/ardizariat/generate-pdf/internal/prompt"
 	"github.com/ardizariat/generate-pdf/internal/report"
 )
+
+// newLogger is logging.New; tests replace it to observe the verbose logger.
+var newLogger = logging.New
 
 // runGenerate executes the explicit generate sequence; rendering lives in report.
 func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
@@ -23,6 +27,12 @@ func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
 	}
 	if err := config.Validate(cfg); err != nil {
 		return fmt.Errorf("validasi config: %w", err)
+	}
+
+	// main builds a warn-level logger before flags are parsed, so verbose
+	// needs its own logger once the final config is known.
+	if cfg.Verbose {
+		logger = newLogger(true)
 	}
 
 	cfg, err = prompt.Fill(cmd, cfg)
