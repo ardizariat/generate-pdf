@@ -1,4 +1,4 @@
-// Package prompt renders the interactive forms that fill missing configuration.
+// Package prompt renders the interactive batch forms that fill a job list.
 package prompt
 
 import (
@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"charm.land/huh/v2"
-	"github.com/spf13/cobra"
 
 	"github.com/ardizariat/generate-pdf/internal/config"
 )
@@ -23,155 +22,185 @@ var typeLabels = map[string]string{
 	config.TypeCertificate: "Sertifikat",
 }
 
-// defaultRows mirrors the per-type row defaults in package config. Types
-// missing from this map have no table, so rows is never asked for them.
-// shortcut: duplicated because config does not export per-type defaults;
-// export them from config if a second consumer appears.
-var defaultRows = map[string]int{
-	config.TypeInvoice:  8,
-	config.TypeReport:   70,
-	config.TypeDelivery: 25,
+// jobAnswers holds one file's raw form answers before defaults are resolved.
+type jobAnswers struct {
+	Type  string
+	Pages int
+	Seed  uint64
+	Out   string
 }
 
-// Fill asks for the configuration fields that were not supplied by flag, env,
-// or config file. It is a no-op when input is disabled or stdin is not a
-// terminal. The returned Config still needs final validation by the caller.
-func Fill(cmd *cobra.Command, cfg config.Config) (config.Config, error) {
+// IsInteractive reports whether stdin is a terminal, so the CLI can decide
+// whether to show the batch forms.
+func IsInteractive() bool {
+	return isTerminal()
+}
+
+// FillBatch asks for the number of files, one form per file, then a final
+// confirmation. It must run on an interactive terminal.
+func FillBatch(cfg config.Config) ([]config.Job, error) {
 	if cfg.NoInput || !isTerminal() {
-		return cfg, nil
+		return nil, errors.New("prompt batch membutuhkan terminal interaktif")
 	}
 
-	fields := fieldsToAsk(cmd, cfg)
-	previousType := cfg.Type
-	if contains(fields, "type") {
-		if err := askType(&cfg); err != nil {
-			return cfg, err
+	count := "1"
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewInput().Title("Jumlah file").Value(&count).Validate(validateCount),
+	)).Run(); err != nil {
+		return nil, mapAbort(err)
+	}
+	total, err := strconv.Atoi(count)
+	if err != nil {
+		return nil, fmt.Errorf("parse jumlah file: %w", err)
+	}
+
+	answers := make([]jobAnswers, 0, total)
+	for i := 0; i < total; i++ {
+		answer, err := askJob(cfg, i+1)
+		if err != nil {
+			return nil, err
 		}
-	}
-	applyTypeDefaults(&cfg, previousType)
-	if !cfg.Provided("out") {
-		cfg.Out = fmt.Sprintf("%s-%d.pdf", cfg.Type, cfg.Seed)
+		answers = append(answers, answer)
 	}
 
-	fields = fieldsToAsk(cmd, cfg)
-	if err := askDetails(&cfg, fields); err != nil {
-		return cfg, err
+	jobs, err := buildJobs(cfg, answers)
+	if err != nil {
+		return nil, err
 	}
-	return cfg, nil
+
+	confirmed := true
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title(fmt.Sprintf("Generate %d file?", len(jobs))).
+			Description(formatJobs(jobs)).
+			Affirmative("Ya").
+			Negative("Batal").
+			Value(&confirmed),
+	)).Run(); err != nil {
+		return nil, mapAbort(err)
+	}
+	if !confirmed {
+		return nil, errors.New("input dibatalkan")
+	}
+	return jobs, nil
 }
 
-// fieldsToAsk lists the config keys the forms must ask for. cmd is accepted
-// for symmetry with config.Load; cfg.Provided already covers flags, env, and
-// the config file.
-func fieldsToAsk(_ *cobra.Command, cfg config.Config) []string {
-	fields := make([]string, 0, 4)
+// askJob renders the form for one file. Values already provided globally are
+// defaults and are not asked again; pages and output are always asked.
+func askJob(cfg config.Config, index int) (jobAnswers, error) {
+	answer := jobAnswers{Type: cfg.Type, Pages: 1, Seed: cfg.Seed}
+	pages := strconv.Itoa(answer.Pages)
+	seed := strconv.FormatUint(answer.Seed, 10)
+	out := ""
+
+	fields := make([]huh.Field, 0, 4)
 	if !cfg.Provided("type") {
-		fields = append(fields, "type")
+		fields = append(fields, huh.NewSelect[string]().
+			Title(fmt.Sprintf("File %d: jenis dokumen", index)).
+			Options(typeOptions()...).
+			Value(&answer.Type))
 	}
-	if !cfg.Provided("rows") && hasTable(cfg.Type) {
-		fields = append(fields, "rows")
-	}
+	fields = append(fields, huh.NewInput().
+		Title(fmt.Sprintf("File %d: jumlah halaman", index)).
+		Value(&pages).
+		Validate(validatePages))
 	if !cfg.Provided("seed") {
-		fields = append(fields, "seed")
-	}
-	if !cfg.Provided("out") {
-		fields = append(fields, "out")
-	}
-	return fields
-}
-
-// applyTypeDefaults refreshes defaults that depend on the selected type when
-// the user changes it in the form.
-func applyTypeDefaults(cfg *config.Config, previousType string) {
-	if cfg.Type == previousType {
-		return
-	}
-	if !cfg.Provided("rows") {
-		cfg.Rows = defaultRows[cfg.Type]
-	}
-	if !cfg.Provided("title") {
-		cfg.Title = typeLabels[cfg.Type]
-	}
-}
-
-func askType(cfg *config.Config) error {
-	types := config.Types()
-	options := make([]huh.Option[string], 0, len(types))
-	for _, typ := range types {
-		options = append(options, huh.NewOption(typeLabels[typ], typ))
-	}
-
-	form := huh.NewForm(huh.NewGroup(
-		huh.NewSelect[string]().
-			Title("Jenis dokumen").
-			Options(options...).
-			Value(&cfg.Type),
-	))
-	if err := form.Run(); err != nil {
-		return mapAbort(err)
-	}
-	return nil
-}
-
-func askDetails(cfg *config.Config, fields []string) error {
-	rows := strconv.Itoa(cfg.Rows)
-	seed := strconv.FormatUint(cfg.Seed, 10)
-	out := cfg.Out
-
-	inputs := make([]huh.Field, 0, 3)
-	if contains(fields, "rows") {
-		inputs = append(inputs, huh.NewInput().
-			Title("Jumlah baris").
-			Value(&rows).
-			Validate(validateRows))
-	}
-	if contains(fields, "seed") {
-		inputs = append(inputs, huh.NewInput().
-			Title("Seed").
+		fields = append(fields, huh.NewInput().
+			Title(fmt.Sprintf("File %d: seed", index)).
 			Value(&seed).
 			Validate(validateSeed))
 	}
-	if contains(fields, "out") {
-		inputs = append(inputs, huh.NewInput().
-			Title("Path output").
-			Value(&out).
-			Validate(validateOut))
-	}
-	if len(inputs) == 0 {
-		return nil
+	fields = append(fields, huh.NewInput().
+		Title(fmt.Sprintf("File %d: path output (kosong = default)", index)).
+		Value(&out))
+
+	if err := huh.NewForm(huh.NewGroup(fields...)).Run(); err != nil {
+		return jobAnswers{}, mapAbort(err)
 	}
 
-	if err := huh.NewForm(huh.NewGroup(inputs...)).Run(); err != nil {
-		return mapAbort(err)
+	value, err := strconv.Atoi(pages)
+	if err != nil {
+		return jobAnswers{}, fmt.Errorf("parse pages: %w", err)
+	}
+	answer.Pages = value
+	if !cfg.Provided("seed") {
+		parsed, err := strconv.ParseUint(seed, 10, 64)
+		if err != nil {
+			return jobAnswers{}, fmt.Errorf("parse seed: %w", err)
+		}
+		answer.Seed = parsed
+	}
+	answer.Out = out
+	return answer, nil
+}
+
+// buildJobs resolves defaults and validates the whole batch before generating.
+func buildJobs(base config.Config, answers []jobAnswers) ([]config.Job, error) {
+	jobs := make([]config.Job, 0, len(answers))
+	for i, answer := range answers {
+		job := config.Job{
+			Type:  answer.Type,
+			Pages: answer.Pages,
+			Seed:  answer.Seed,
+			Out:   answer.Out,
+			Title: base.Title,
+		}
+		if job.Type == "" {
+			job.Type = base.Type
+		}
+		if !base.Provided("title") {
+			job.Title = typeLabels[job.Type]
+		}
+		if job.Out == "" {
+			job.Out = fmt.Sprintf("%s-%d-%d.pdf", job.Type, i+1, job.Seed)
+		}
+		jobs = append(jobs, job)
 	}
 
-	if contains(fields, "rows") {
-		value, err := strconv.Atoi(rows)
-		if err != nil {
-			return fmt.Errorf("parse rows: %w", err)
-		}
-		cfg.Rows = value
+	if err := config.ValidateJobs(jobs); err != nil {
+		return nil, err
 	}
-	if contains(fields, "seed") {
-		value, err := strconv.ParseUint(seed, 10, 64)
-		if err != nil {
-			return fmt.Errorf("parse seed: %w", err)
+	return jobs, nil
+}
+
+func formatJobs(jobs []config.Job) string {
+	result := ""
+	for i, job := range jobs {
+		if i > 0 {
+			result += "\n"
 		}
-		cfg.Seed = value
+		result += fmt.Sprintf("%d. %s  %d halaman  %s", i+1, job.Type, job.Pages, job.Out)
 	}
-	if contains(fields, "out") {
-		cfg.Out = out
+	return result
+}
+
+func typeOptions() []huh.Option[string] {
+	types := config.Types()
+	options := make([]huh.Option[string], 0, len(types))
+	for _, docType := range types {
+		options = append(options, huh.NewOption(typeLabels[docType], docType))
+	}
+	return options
+}
+
+func validateCount(value string) error {
+	count, err := strconv.Atoi(value)
+	if err != nil {
+		return errors.New("masukkan angka bulat")
+	}
+	if count < 1 {
+		return errors.New("minimal 1 file")
 	}
 	return nil
 }
 
-func validateRows(value string) error {
-	rows, err := strconv.Atoi(value)
+func validatePages(value string) error {
+	pages, err := strconv.Atoi(value)
 	if err != nil {
 		return errors.New("masukkan angka bulat")
 	}
-	if rows < 0 {
-		return errors.New("minimal 0")
+	if pages < 1 {
+		return errors.New("minimal 1 halaman")
 	}
 	return nil
 }
@@ -179,13 +208,6 @@ func validateRows(value string) error {
 func validateSeed(value string) error {
 	if _, err := strconv.ParseUint(value, 10, 64); err != nil {
 		return errors.New("masukkan angka bulat 0 atau lebih")
-	}
-	return nil
-}
-
-func validateOut(value string) error {
-	if value == "" {
-		return errors.New("path output wajib diisi")
 	}
 	return nil
 }
@@ -202,18 +224,4 @@ func mapAbort(err error) error {
 func isTerminal() bool {
 	info, err := os.Stdin.Stat()
 	return err == nil && info.Mode()&os.ModeCharDevice != 0
-}
-
-func hasTable(docType string) bool {
-	_, ok := defaultRows[docType]
-	return ok
-}
-
-func contains(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
-	}
-	return false
 }

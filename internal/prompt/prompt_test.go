@@ -26,6 +26,7 @@ func loadConfig(t *testing.T, args ...string) config.Config {
 	flags.IntP("rows", "r", 0, "")
 	flags.Uint64P("seed", "s", 42, "")
 	flags.String("title", "", "")
+	flags.String("batch", "", "")
 	flags.Bool("no-input", false, "")
 	flags.Bool("force", false, "")
 	flags.Bool("verify", false, "")
@@ -38,85 +39,56 @@ func loadConfig(t *testing.T, args ...string) config.Config {
 	return cfg
 }
 
-func TestFieldsToAsk(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-		env  map[string]string
-		want []string
-	}{
-		{
-			name: "nothing provided",
-			want: []string{"type", "rows", "seed", "out"},
-		},
-		{
-			name: "everything provided",
-			args: []string{"--type", config.TypeInvoice, "--rows", "8", "--seed", "7", "--out", "out.pdf"},
-			want: []string{},
-		},
-		{
-			name: "type without table skips rows",
-			args: []string{"--type", config.TypeLetter},
-			want: []string{"seed", "out"},
-		},
-		{
-			name: "env provides seed",
-			env:  map[string]string{"GENPDF_SEED": "7"},
-			want: []string{"type", "rows", "out"},
-		},
+func TestBuildJobsDefaults(t *testing.T) {
+	base := loadConfig(t)
+	answers := []jobAnswers{
+		{Type: config.TypeReport, Pages: 2, Seed: 7},
+		{Pages: 1, Seed: 9, Out: "custom.pdf"},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			for key, value := range tc.env {
-				t.Setenv(key, value)
-			}
-
-			cfg := loadConfig(t, tc.args...)
-			assert.Equal(t, tc.want, fieldsToAsk(nil, cfg))
-		})
-	}
-}
-
-func TestApplyTypeDefaults(t *testing.T) {
-	cfg := loadConfig(t)
-	cfg.Type = config.TypeLetter
-	applyTypeDefaults(&cfg, config.TypeInvoice)
-	assert.Equal(t, 0, cfg.Rows, "type without table")
-	assert.Equal(t, "Surat Resmi", cfg.Title)
-
-	provided := loadConfig(t, "--rows", "5")
-	provided.Type = config.TypeCertificate
-	applyTypeDefaults(&provided, config.TypeInvoice)
-	assert.Equal(t, 5, provided.Rows, "explicit rows must not be overwritten")
-}
-
-func TestFillSkipsWhenStdinIsNotTerminal(t *testing.T) {
-	cfg := loadConfig(t)
-	swapStdin(t, pipeStdin(t))
-
-	got, err := Fill(nil, cfg)
+	jobs, err := buildJobs(base, answers)
 	require.NoError(t, err)
-	assert.Equal(t, cfg, got)
+	require.Len(t, jobs, 2)
+
+	assert.Equal(t, config.Job{Type: config.TypeReport, Pages: 2, Seed: 7, Out: "laporan-1-7.pdf", Title: "Laporan"}, jobs[0])
+	assert.Equal(t, config.Job{Type: config.TypeInvoice, Pages: 1, Seed: 9, Out: "custom.pdf", Title: "Invoice"}, jobs[1])
 }
 
-func TestFillSkipsWhenInputDisabled(t *testing.T) {
+func TestBuildJobsUsesProvidedTitle(t *testing.T) {
+	base := loadConfig(t, "--title", "Judul Khusus")
+	jobs, err := buildJobs(base, []jobAnswers{{Type: config.TypeReceipt, Pages: 1, Seed: 42}})
+	require.NoError(t, err)
+	assert.Equal(t, "Judul Khusus", jobs[0].Title)
+}
+
+func TestBuildJobsRejectsInvalidBatch(t *testing.T) {
+	base := loadConfig(t)
+
+	_, err := buildJobs(base, []jobAnswers{{Type: config.TypeLetter, Pages: 2, Seed: 42}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "surat-resmi")
+
+	_, err = buildJobs(base, []jobAnswers{{Type: config.TypeInvoice, Pages: 0, Seed: 42}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Pages=0")
+}
+
+func TestFillBatchRequiresTerminal(t *testing.T) {
 	cfg := loadConfig(t, "--no-input")
-
-	got, err := Fill(nil, cfg)
-	require.NoError(t, err)
-	assert.Equal(t, cfg, got)
+	_, err := FillBatch(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "terminal interaktif")
 }
 
 func TestMapAbort(t *testing.T) {
 	aborted := mapAbort(huh.ErrUserAborted)
 	require.Error(t, aborted)
 	assert.Contains(t, aborted.Error(), "dibatalkan")
-	assert.True(t, errors.Is(aborted, huh.ErrUserAborted))
+	assert.ErrorIs(t, aborted, huh.ErrUserAborted)
 
 	wrapped := mapAbort(fmt.Errorf("run form: %w", huh.ErrUserAborted))
 	require.Error(t, wrapped)
-	assert.True(t, errors.Is(wrapped, huh.ErrUserAborted))
+	assert.ErrorIs(t, wrapped, huh.ErrUserAborted)
 
 	other := errors.New("boom")
 	assert.Equal(t, other, mapAbort(other))
@@ -124,22 +96,18 @@ func TestMapAbort(t *testing.T) {
 }
 
 func TestValidateInput(t *testing.T) {
-	rows := []struct {
-		value string
-		valid bool
-	}{
-		{value: "0", valid: true},
-		{value: "8", valid: true},
-		{value: "-1", valid: false},
-		{value: "abc", valid: false},
+	for _, value := range []string{"1", "2", "10"} {
+		assert.NoError(t, validateCount(value), value)
 	}
-	for _, tc := range rows {
-		err := validateRows(tc.value)
-		if tc.valid {
-			assert.NoError(t, err, tc.value)
-		} else {
-			assert.Error(t, err, tc.value)
-		}
+	for _, value := range []string{"", "0", "-1", "abc"} {
+		assert.Error(t, validateCount(value), value)
+	}
+
+	for _, value := range []string{"1", "3"} {
+		assert.NoError(t, validatePages(value), value)
+	}
+	for _, value := range []string{"", "0", "-1", "abc"} {
+		assert.Error(t, validatePages(value), value)
 	}
 
 	assert.NoError(t, validateSeed("0"))
@@ -147,26 +115,19 @@ func TestValidateInput(t *testing.T) {
 	for _, value := range []string{"", "-1", "abc"} {
 		assert.Error(t, validateSeed(value), value)
 	}
-
-	assert.NoError(t, validateOut("invoice-42.pdf"))
-	assert.Error(t, validateOut(""))
 }
 
-// pipeStdin returns the read end of a pipe, which is not a character device.
-func pipeStdin(t *testing.T) *os.File {
-	t.Helper()
+func TestPipeStdinIsNotInteractive(t *testing.T) {
 	read, write, err := os.Pipe()
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = read.Close()
 		_ = write.Close()
 	})
-	return read
-}
 
-func swapStdin(t *testing.T, stdin *os.File) {
-	t.Helper()
 	previous := os.Stdin
-	os.Stdin = stdin
+	os.Stdin = read
 	t.Cleanup(func() { os.Stdin = previous })
+
+	assert.False(t, IsInteractive())
 }

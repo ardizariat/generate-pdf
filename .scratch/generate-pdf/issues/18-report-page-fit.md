@@ -1,6 +1,6 @@
 # 18 — Report: isi menyesuaikan target halaman
 
-Status: ready-for-agent
+Status: done
 Blocked by: none
 Type: task
 

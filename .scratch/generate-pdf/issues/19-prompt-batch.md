@@ -1,6 +1,6 @@
 # 19 — Prompt batch interaktif
 
-Status: ready-for-agent
+Status: done
 Blocked by: 17
 Type: task
 

@@ -35,12 +35,20 @@ func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
 		logger = newLogger(true)
 	}
 
-	cfg, err = prompt.Fill(cmd, cfg)
-	if err != nil {
-		return fmt.Errorf("isi prompt: %w", err)
+	if cfg.Batch != "" {
+		jobs, err := config.LoadBatch(cfg.Batch, cfg)
+		if err != nil {
+			return fmt.Errorf("muat batch: %w", err)
+		}
+		return runBatch(cmd, logger, cfg, jobs)
 	}
-	if err := config.Validate(cfg); err != nil {
-		return fmt.Errorf("validasi config akhir: %w", err)
+
+	if !cfg.NoInput && prompt.IsInteractive() {
+		jobs, err := prompt.FillBatch(cfg)
+		if err != nil {
+			return fmt.Errorf("isi prompt: %w", err)
+		}
+		return runBatch(cmd, logger, cfg, jobs)
 	}
 
 	if _, err := os.Stat(cfg.Out); err == nil {
@@ -57,6 +65,7 @@ func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
 	if err != nil {
 		return fmt.Errorf("buat data %s: %w", cfg.Type, err)
 	}
+	payload.Title = cfg.Title
 
 	pages, size, err := report.Generate(payload, cfg.Out, cfg.Verify)
 	if err != nil {

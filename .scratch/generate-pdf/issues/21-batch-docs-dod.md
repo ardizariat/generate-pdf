@@ -1,6 +1,6 @@
 # 21 — Dokumentasi batch dan Definition of Done
 
-Status: ready-for-agent
+Status: done
 Blocked by: 20
 Type: task
 
@@ -34,3 +34,8 @@ plus generate batch nyata ke `/tmp/opencode/pdfcheck/batch/` dengan manifest hal
 ## Out of scope
 
 Fitur baru, refactor kosmetik, perubahan perilaku mode satu file.
+
+## Comments
+
+- Selesai. Verifikasi akhir: 155 tes lulus (biasa dan `-race`), `golangci-lint` 0 issue, `go mod tidy` idempoten (hash `go.mod`/`go.sum` sama pada run kedua).
+- Batch nyata ke `/tmp/opencode/pdfcheck/batch`: invoice 1 halaman, laporan 2 halaman, surat-jalan 3 halaman, semua lolos `--verify`, exit 0, ringkasan `3 sukses, 0 gagal`.

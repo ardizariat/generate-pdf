@@ -43,6 +43,7 @@ func New(logger *zap.Logger) *cobra.Command {
 	cmd.Flags().IntP("rows", "r", defaultRows, "jumlah baris tabel (-1 = default per jenis)")
 	cmd.Flags().Uint64P("seed", "s", defaultSeed, "seed data; 0 berarti acak")
 	cmd.Flags().String("title", "", "judul dokumen (default per jenis)")
+	cmd.Flags().String("batch", "", "path manifest YAML berisi daftar job")
 	cmd.Flags().Bool("no-input", false, "matikan prompt interaktif")
 	cmd.Flags().Bool("force", false, "izinkan menimpa file output yang sudah ada")
 	cmd.Flags().Bool("verify", false, "validasi PDF dengan pdfcpu setelah ditulis")

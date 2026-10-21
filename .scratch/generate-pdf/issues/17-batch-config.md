@@ -1,6 +1,6 @@
 # 17 — Config batch: model job dan manifest YAML
 
-Status: ready-for-agent
+Status: done
 Blocked by: none
 Type: task
 

@@ -19,7 +19,8 @@ Alternatif tanpa instalasi: `make build` lalu jalankan `./pdfgen`.
 ## Cara pakai
 
 ```bash
-pdfgen [flags]       # hasilkan dokumen
+pdfgen [flags]       # hasilkan satu dokumen
+pdfgen --batch jobs.yaml   # hasilkan banyak dokumen, halaman per file
 pdfgen types         # tampilkan jenis dokumen yang didukung
 ```
 
@@ -55,6 +56,7 @@ lain nilainya diabaikan.
 | `-r, --rows` | per jenis (lihat tabel di atas) | Jumlah baris tabel; diabaikan bila jenis tidak bertabel |
 | `-s, --seed` | `42` | Seed data (`uint64`); `0` berarti acak |
 | `--title` | per jenis | Judul dokumen |
+| `--batch` | kosong | Path manifest YAML berisi daftar job; bila diisi, mode batch |
 | `--no-input` | `false` | Matikan prompt interaktif |
 | `--force` | `false` | Izinkan menimpa file output yang sudah ada |
 | `--verify` | `false` | Validasi PDF dengan pdfcpu setelah file ditulis |
@@ -84,8 +86,8 @@ menulis file konfigurasi. Nama key sama dengan nama flag.
 
 Environment variable memakai prefix `GENPDF_` dengan `-` diganti `_`:
 `GENPDF_TYPE`, `GENPDF_OUT`, `GENPDF_ROWS`, `GENPDF_SEED`, `GENPDF_TITLE`,
-`GENPDF_NO_INPUT`, `GENPDF_FORCE`, `GENPDF_VERIFY`, `GENPDF_VERBOSE`,
-`GENPDF_CONFIG`.
+`GENPDF_BATCH`, `GENPDF_NO_INPUT`, `GENPDF_FORCE`, `GENPDF_VERIFY`,
+`GENPDF_VERBOSE`, `GENPDF_CONFIG`.
 
 Config divalidasi setelah semua sumber digabung dan sekali lagi setelah prompt:
 `type` wajib salah satu jenis di atas, `rows` minimal `0`, `out` wajib terisi.
@@ -93,19 +95,52 @@ Config divalidasi setelah semua sumber digabung dan sekali lagi setelah prompt:
 ## Mode interaktif dan noninteraktif
 
 - **Interaktif** aktif bila stdin adalah terminal dan `--no-input` tidak diberikan.
-  Form menanyakan jenis dokumen, jumlah baris (hanya untuk jenis bertabel), seed, dan
-  path output. Field yang sudah diisi lewat flag, env, atau file konfigurasi tidak
-  ditanyakan lagi. Membatalkan form menghasilkan error `input dibatalkan` dan exit
-  code `1`.
-- **Noninteraktif** berlaku bila `--no-input` diberikan atau stdin bukan terminal.
-  Semua nilai diambil dari flag, env, file konfigurasi, atau default; tidak ada
-  pertanyaan dan tidak ada pembacaan stdin.
+  Form pertama menanyakan **jumlah file**, lalu satu form per file: jenis dokumen,
+  **jumlah halaman**, seed, dan path output. Setelah semua terisi muncul ringkasan dan
+  konfirmasi sebelum generate. Nilai `type`/`seed`/`title` yang sudah diberikan lewat
+  flag, env, atau file konfigurasi tidak ditanyakan lagi; `--rows` tidak ditanyakan.
+  Membatalkan form menghasilkan error `input dibatalkan` dan exit code `1`.
+- **Noninteraktif** berlaku bila `--no-input` diberikan, stdin bukan terminal, atau
+  `--batch` digunakan. Semua nilai diambil dari flag, env, file konfigurasi, atau
+  default; tidak ada pertanyaan dan tidak ada pembacaan stdin.
+
+## Batch dan target halaman
+
+`--batch jobs.yaml` menghasilkan setiap entri manifest sebagai satu PDF:
+
+```yaml
+jobs:
+  - type: invoice
+    pages: 2
+    seed: 7
+    out: invoice-a.pdf
+  - type: laporan
+    pages: 3
+    seed: 8
+```
+
+- Field job (`type`, `pages`, `seed`, `out`, `title`) menimpa nilai global; field yang
+  kosong mewarisi flag/env/file/default. `out` kosong menjadi
+  `<type>-<index>-<seed>.pdf` dengan index mulai 1.
+- `pages` default `1` dan harus tepat. Isi tabel diisi semaksimal mungkin untuk jumlah
+  halaman itu; jumlah halaman akhir dihitung pdfcpu dan target yang tidak tercapai
+  menggagalkan job tersebut.
+- `pages` > 1 hanya untuk `invoice`, `laporan`, dan `surat-jalan`. Jenis lain wajib
+  1 halaman.
+- Seluruh job divalidasi sebelum render: satu entri tidak valid menggagalkan batch
+  tanpa menulis file apa pun.
+- Satu job gagal tidak menghentikan job lain. Ringkasan per file dicetak ke stdout,
+  mis. `ok     laporan.pdf  3 halaman  178697 bytes`, dan exit code `1` bila ada
+  kegagalan.
+- `--force`, `--verify`, dan `-v` berlaku untuk semua job.
 
 ## Perilaku output
 
-- Nama default `<type>-<seed>.pdf` di direktori kerja.
+- Nama default `<type>-<seed>.pdf` di direktori kerja; pada batch
+  `<type>-<index>-<seed>.pdf`.
 - Bila file tujuan sudah ada, generate **ditolak** dengan error yang menyebut path dan
-  cara mengizinkannya. `--force` mengizinkan penimpaan.
+  cara mengizinkannya. `--force` mengizinkan penimpaan. Pada batch, hanya job itu yang
+  gagal dan job lain tetap berjalan.
 - Direktori tujuan harus sudah ada; direktori yang tidak ada menghasilkan error, bukan
   panic.
 - `--verify` memvalidasi hasil dengan pdfcpu setelah file ditulis; verifikasi gagal
@@ -118,6 +153,7 @@ Config divalidasi setelah semua sumber digabung dan sekali lagi setelah prompt:
 - Seed, jenis, jumlah baris, dan judul yang sama menghasilkan PDF dengan isi dan
   metadata identik. Tanggal dokumen diturunkan dari seed
   (`time.Unix(seed, 0).UTC()`) dan ID dokumen adalah UUID v5 dari `<type>-<seed>`.
+  Pada batch, setiap job memakai seed-nya sendiri.
 - `--seed 0` berarti data acak; output tidak deterministik.
 - Default seed adalah `42`, sehingga pemakaian tanpa flag tetap dapat direproduksi.
 

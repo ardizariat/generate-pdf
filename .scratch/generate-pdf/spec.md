@@ -171,6 +171,7 @@ Zap console encoder ke stderr; `warn` default, `info` dengan `-v`. Satu ringkasa
 | `stretchr/testify` | assertion test |
 | `spf13/cobra` | perintah & flag |
 | `spf13/viper` | config file/env/flag |
+| `go.yaml.in/yaml/v3` | parse manifest batch (`jobs:`) |
 | `charm.land/huh/v2` | prompt |
 | `charm.land/lipgloss/v2` | styling `types` dan ringkasan |
 | `go.uber.org/zap` | logging |

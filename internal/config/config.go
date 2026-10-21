@@ -32,7 +32,7 @@ const (
 )
 
 // configKeys is read-only: viper key = flag name.
-var configKeys = [...]string{"type", "out", "rows", "seed", "title", "no-input", "force", "verify", "verbose", "config"}
+var configKeys = [...]string{"type", "out", "rows", "seed", "title", "batch", "no-input", "force", "verify", "verbose", "config"}
 
 type defaults struct {
 	rows  int
@@ -59,6 +59,7 @@ type Config struct {
 	Type       string `validate:"required,oneof=invoice surat-resmi laporan kuitansi surat-jalan sertifikat"`
 	Out        string `validate:"required"`
 	Title      string
+	Batch      string
 	Rows       int `validate:"gte=0"`
 	Seed       uint64
 	NoInput    bool
@@ -102,6 +103,7 @@ func Load(cmd *cobra.Command) (Config, error) {
 		Type:       v.GetString("type"),
 		Out:        v.GetString("out"),
 		Title:      v.GetString("title"),
+		Batch:      v.GetString("batch"),
 		Rows:       v.GetInt("rows"),
 		Seed:       v.GetUint64("seed"),
 		NoInput:    v.GetBool("no-input"),

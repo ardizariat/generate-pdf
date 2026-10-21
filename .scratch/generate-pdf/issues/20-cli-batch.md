@@ -1,6 +1,6 @@
 # 20 — CLI batch: flag, alur, ringkasan
 
-Status: ready-for-agent
+Status: done
 Blocked by: 17, 18, 19
 Type: task
 
@@ -28,3 +28,7 @@ Type: task
 ## Out of scope
 
 Generate paralel, override `--verify`/`--force` per job, tipe dokumen baru, perubahan perilaku flag lama.
+
+## Comments
+
+- Selesai. Ditemukan bug lama: `--title` tidak pernah dipakai karena `data.Generate` selalu memakai judul default. Diperbaiki minimal di CLI (`payload.Title`/`job.Title`), diuji lewat batch dua judul berbeda yang menghasilkan byte berbeda.
