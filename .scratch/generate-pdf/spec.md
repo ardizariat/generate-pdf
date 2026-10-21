@@ -120,6 +120,7 @@ jobs:
 - `os.Stat` pada path: jika file ada dan `--force` false → error yang menyebut path dan cara mengizinkannya.
 - Direktori tujuan tidak ada → error jelas, bukan panic.
 - `report.Generate` menulis file lalu, bila `--verify`, memvalidasi dengan pdfcpu; hanya setelah itu generate dinyatakan berhasil.
+- Progress ditulis ke stderr: spinner `[2/3] file.pdf · target 2 halaman` bila stdin dan stderr terminal; bila bukan terminal, satu baris teks. `-v` mematikan progress karena log zap sudah menampilkan tahapan. stdout hanya berisi ringkasan hasil.
 
 ## Determinisme
 

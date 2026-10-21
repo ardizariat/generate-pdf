@@ -61,15 +61,24 @@ func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
 
 	start := time.Now()
 
-	payload, err := data.Generate(cfg.Type, cfg.Rows, cfg.Seed)
-	if err != nil {
-		return fmt.Errorf("buat data %s: %w", cfg.Type, err)
-	}
-	payload.Title = cfg.Title
+	var pages int
+	var size int64
+	var genErr error
+	progress(cfg, fmt.Sprintf("[1/1] %s · target %d baris", cfg.Out, cfg.Rows), func() {
+		payload, err := data.Generate(cfg.Type, cfg.Rows, cfg.Seed)
+		if err != nil {
+			genErr = fmt.Errorf("buat data %s: %w", cfg.Type, err)
+			return
+		}
+		payload.Title = cfg.Title
 
-	pages, size, err := report.Generate(payload, cfg.Out, cfg.Verify)
-	if err != nil {
-		return fmt.Errorf("buat pdf %s: %w", cfg.Out, err)
+		pages, size, genErr = report.Generate(payload, cfg.Out, cfg.Verify)
+		if genErr != nil {
+			genErr = fmt.Errorf("buat pdf %s: %w", cfg.Out, genErr)
+		}
+	})
+	if genErr != nil {
+		return genErr
 	}
 
 	logger.Info("generate selesai",

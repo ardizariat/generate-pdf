@@ -23,12 +23,17 @@ func runBatch(cmd *cobra.Command, logger *zap.Logger, cfg config.Config, jobs []
 
 	out := cmd.OutOrStdout()
 	failures := 0
-	for _, job := range jobs {
+	for i, job := range jobs {
 		start := time.Now()
-		pages, size, err := generateJob(job, cfg)
-		if err != nil {
+		var pages int
+		var size int64
+		var jobErr error
+		progress(cfg, fmt.Sprintf("[%d/%d] %s · target %d halaman", i+1, len(jobs), job.Out, job.Pages), func() {
+			pages, size, jobErr = generateJob(job, cfg)
+		})
+		if jobErr != nil {
 			failures++
-			if _, writeErr := fmt.Fprintf(out, "gagal  %s: %v\n", job.Out, err); writeErr != nil {
+			if _, writeErr := fmt.Fprintf(out, "gagal  %s: %v\n", job.Out, jobErr); writeErr != nil {
 				return fmt.Errorf("tulis ringkasan: %w", writeErr)
 			}
 			continue

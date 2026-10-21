@@ -135,6 +135,10 @@ jobs:
   mis. `ok     laporan.pdf  3 halaman  178697 bytes`, dan exit code `1` bila ada
   kegagalan.
 - `--force`, `--verify`, dan `-v` berlaku untuk semua job.
+- Selama generate, progress ditulis ke stderr: spinner
+  `[2/3] file.pdf · target 2 halaman` bila stdin dan stderr terminal; bila bukan
+  terminal, satu baris teks. `-v` mematikan progress karena log zap sudah menampilkan
+  tahapan. stdout tetap hanya berisi ringkasan.
 
 ## Perilaku output
 
