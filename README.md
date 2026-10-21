@@ -1,10 +1,14 @@
 # generate-pdf (pdfgen)
 
-CLI Go untuk menghasilkan PDF **dummy** bagi enam jenis dokumen kantor Indonesia.
-Hasilnya valid (dapat diverifikasi dengan pdfcpu) dan isinya deterministik untuk seed
-yang sama, sehingga cocok dipakai sebagai fixture test, showcase layout, maupun contoh
-data untuk stakeholder. Nama file default tetap unik per generate (timestamp + UUID).
-Seluruh data dan tanda tangan bersifat fiktif.
+`pdfgen` membuat file PDF **contoh (dummy)** untuk enam jenis dokumen kantor:
+invoice, surat resmi, laporan, kuitansi, surat jalan, dan sertifikat.
+
+Semua isinya data karangan, bukan data asli, jadi aman dipakai untuk demo, latihan,
+tampilan ke klien, atau menguji aplikasi lain yang membutuhkan contoh PDF. File bisa
+dibuka di pembaca PDF biasa dan lolos pemeriksaan `pdfcpu`.
+
+Dengan `seed` yang sama, isi PDF selalu sama, sehingga hasilnya bisa diulang untuk
+pengujian. Nama file tetap berbeda tiap kali generate supaya tidak saling menimpa.
 
 ## Persyaratan dan instalasi
 
@@ -18,6 +22,14 @@ go install ./cmd/pdfgen
 Alternatif tanpa instalasi: `make build` lalu jalankan `./pdfgen`.
 
 ## Cara pakai
+
+Pilih cara yang sesuai kebutuhan:
+
+| Kebutuhan | Cara |
+|---|---|
+| Coba-coba dan ingin dituntun form | jalankan `pdfgen` di terminal |
+| Satu PDF dengan pengaturan tertentu | `pdfgen --no-input` + flag |
+| Banyak PDF sekaligus dengan daftar pengaturan | `pdfgen --batch jobs.yaml` |
 
 ### Interaktif
 
@@ -155,43 +167,75 @@ diberikan, path dihitung dari `--out-dir` dan nama file otomatis.
 
 ## Batch dan target halaman
 
-`--batch jobs.yaml` menghasilkan setiap entri manifest sebagai satu PDF:
+Bagian ini dipakai untuk membuat **banyak PDF sekaligus** tanpa menjawab form satu per
+satu. Cocok saat Anda butuh puluhan atau ratusan file contoh untuk menguji aplikasi,
+mengisi folder demo, atau menyiapkan bahan presentasi.
+
+Caranya: tulis "daftar pesanan" PDF di satu file YAML bernama `jobs.yaml` (disebut
+**manifest**), lalu jalankan satu perintah. Setiap entri di daftar itu menjadi satu file
+PDF.
+
+Contoh: Anda ingin tiga PDF — invoice 2 halaman, laporan 3 halaman, dan surat jalan
+1 halaman.
 
 ```yaml
 jobs:
-  - type: invoice
-    pages: 2
-    seed: 7
-    out: invoice-a.pdf        # relatif -> <out-dir>/invoice-a.pdf
+  - type: invoice       # jenis dokumen
+    pages: 2            # PDF ini harus tepat 2 halaman
+    seed: 7             # penentu isi; seed sama = isi sama
+    out: invoice-a.pdf  # nama file; relatif -> <out-dir>/invoice-a.pdf
   - type: laporan
     pages: 3
-    seed: 8                   # out kosong -> nama unik otomatis
+    seed: 8             # out tidak ditulis -> nama unik otomatis
+  - type: surat-jalan   # jenis tanpa tabel, wajib 1 halaman
 ```
 
-- `jobs` wajib berisi minimal satu entri; field yang tidak dikenal diabaikan. Batch
-  tidak pernah menampilkan prompt.
-- `--rows` tidak dipakai di mode batch; isi tabel diatur `pages`.
-- Field job (`type`, `pages`, `seed`, `out`, `title`) menimpa nilai global; field yang
-  kosong mewarisi flag/env/file/default. `title` kosong memakai judul default per jenis
-  kecuali `--title` diberikan. `out` kosong menjadi
-  `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf` (timestamp `YYYYMMDDTHHMMSSZ`,
-  UUID dibuat per file). `out` relatif diselesaikan terhadap `--out-dir`; path
-  absolut dipakai apa adanya.
-- `pages` default `1` dan harus tepat. Isi tabel diisi semaksimal mungkin untuk jumlah
-  halaman itu; jumlah halaman akhir dihitung pdfcpu dan target yang tidak tercapai
-  menggagalkan job tersebut.
-- `pages` > 1 hanya untuk `invoice`, `laporan`, dan `surat-jalan`. Jenis lain wajib
-  1 halaman.
-- Seluruh job divalidasi sebelum render: satu entri tidak valid menggagalkan batch
-  tanpa menulis file apa pun.
-- Satu job gagal tidak menghentikan job lain. Ringkasan per file dicetak ke stdout,
-  mis. `ok     output/laporan_20261021T141530Z_0192f3a4-....pdf  3 halaman  178697 bytes`,
-  dan exit code `1` bila ada kegagalan.
-- `--force`, `--verify`, dan `-v` berlaku untuk semua job.
-- Selama generate (batch maupun satu file), progress ditulis ke stderr: spinner
-  `[2/3] file.pdf · target 2 halaman` bila stdin dan stderr terminal; bila bukan
-  terminal, satu baris teks. `-v` mematikan progress karena log zap sudah menampilkan
-  tahapan. stdout tetap hanya berisi ringkasan.
+Jalankan dengan:
+
+```bash
+pdfgen --batch jobs.yaml --no-input
+```
+
+### Arti tiap kolom
+
+| Kolom | Arti sederhana |
+|---|---|
+| `type` | Jenis dokumen yang dibuat. Boleh juga diisi lewat `--type` sebagai default. |
+| `pages` | Jumlah halaman yang **harus** dihasilkan. Default 1. |
+| `seed` | Angka penentu isi. Seed sama menghasilkan isi yang sama; `0` berarti acak. |
+| `out` | Nama/lokasi file. Kosong berarti nama unik otomatis. |
+| `title` | Judul dokumen. Kosong berarti `--title` (bila diberikan) atau judul default sesuai jenis. |
+
+### Yang perlu diketahui
+
+- **`pages` harus tepat.** Untuk dokumen bertabel, program mengisi baris tabel
+  sebanyak mungkin sampai pas dengan jumlah halaman itu, lalu menghitung halaman
+  dengan `pdfcpu`. Kalau target tidak bisa dicapai, file itu gagal dibuat.
+- **Halaman lebih dari 1 hanya untuk dokumen bertabel**: `invoice`, `laporan`, dan
+  `surat-jalan`. `surat-resmi`, `kuitansi`, dan `sertifikat` selalu 1 halaman.
+- **`--rows` tidak dipakai di mode batch.** Jumlah isi tabel diatur oleh `pages`.
+- **Semua entri diperiksa dulu sebelum menulis file.** Satu entri salah membuat seluruh
+  batch berhenti tanpa menghasilkan file apa pun.
+- **Satu file gagal tidak menghentikan sisanya.** Program lanjut ke entri berikutnya,
+  lalu mencetak ringkasan dan exit code `1` bila ada yang gagal.
+- **`type`, `seed`, dan `title` yang kosong mewarisi pengaturan global** dari
+  flag/env/file konfigurasi. `out` kosong menjadi
+  `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf`; `out` relatif diselesaikan terhadap
+  `--out-dir`, sedangkan path absolut dipakai apa adanya.
+- **`--force`, `--verify`, dan `-v` berlaku untuk semua entri.** Tanpa `--force`, file
+  yang sudah ada tidak ditimpa.
+- **Kolom yang tidak dikenal diabaikan**, dan batch tidak pernah menampilkan form.
+
+### Cara membaca hasilnya
+
+Selama proses berjalan, progress muncul di stderr (spinner `[2/3] nama-file.pdf ·
+target 2 halaman`, atau satu baris teks bila bukan terminal). Setelah selesai, stdout
+berisi ringkasan per file, misalnya:
+
+```
+ok     output/laporan_20261021T141530Z_0192f3a4-....pdf  3 halaman  178697 bytes
+ringkasan: 3 sukses, 0 gagal
+```
 
 ## Perilaku output
 
