@@ -16,6 +16,9 @@ const (
 	defaultSeed = 42
 )
 
+// version is set at build time by goreleaser; "dev" for local builds.
+var version = "dev"
+
 // typeDescriptions is read-only: short description per document type for `types`.
 var typeDescriptions = map[string]string{
 	config.TypeInvoice:     "Invoice penjualan dengan tabel barang dan PPN",
@@ -31,6 +34,7 @@ func New(logger *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "pdfgen",
 		Short:         "Generate PDF dokumen dummy Indonesia",
+		Version:       version,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -39,7 +43,7 @@ func New(logger *zap.Logger) *cobra.Command {
 	}
 
 	cmd.Flags().StringP("type", "t", config.TypeInvoice, "jenis dokumen: invoice, surat-resmi, laporan, kuitansi, surat-jalan, sertifikat")
-	cmd.Flags().StringP("out", "o", "", "path output PDF (default <out-dir>/<type>-<seed>.pdf)")
+	cmd.Flags().StringP("out", "o", "", "path output PDF (default <out-dir>/<type>_<waktu UTC>_<uuid v7>.pdf)")
 	cmd.Flags().String("out-dir", config.DefaultOutDir, "folder dasar output; dibuat otomatis bila belum ada")
 	cmd.Flags().IntP("rows", "r", defaultRows, "jumlah baris tabel (-1 = default per jenis)")
 	cmd.Flags().Uint64P("seed", "s", defaultSeed, "seed data; 0 berarti acak")

@@ -1,6 +1,6 @@
 module github.com/ardizariat/generate-pdf
 
-go 1.27.3
+go 1.26.1
 
 require (
 	charm.land/huh/v2 v2.0.3

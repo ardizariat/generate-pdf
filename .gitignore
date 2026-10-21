@@ -7,3 +7,9 @@
 
 # artefak distribusi
 /dist
+
+# dokumen kerja internal, tidak dipublikasikan
+/.scratch/
+/AGENTS.md
+/docs/prompt.md
+/docs/agents/
