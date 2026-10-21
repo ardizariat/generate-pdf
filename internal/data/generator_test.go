@@ -83,7 +83,7 @@ func TestGenerateReceiptAmount(t *testing.T) {
 	assert.True(t, report.Amount.GreaterThanOrEqual(decimal.NewFromInt(100_000)))
 	assert.True(t, report.Amount.LessThanOrEqual(decimal.NewFromInt(50_000_000)))
 	assert.True(t, report.Amount.Mod(decimal.NewFromInt(1000)).IsZero())
-	assert.NotEmpty(t, NumberWords(report.Amount.IntPart()))
+	assert.NotEmpty(t, Terbilang(report.Amount.IntPart()))
 }
 
 func TestGenerateParagraphs(t *testing.T) {

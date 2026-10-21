@@ -49,7 +49,7 @@ func newDocument(r data.Report) (core.Maroto, error) {
 		pageOrientation = orientation.Horizontal
 	}
 
-	cfg := config.NewBuilder().
+	builder := config.NewBuilder().
 		WithPageSize(pagesize.A4).
 		WithOrientation(pageOrientation).
 		WithTopMargin(10).
@@ -60,7 +60,14 @@ func newDocument(r data.Report) (core.Maroto, error) {
 		WithTitle("generate-pdf", true).
 		WithAuthor("generate-pdf", true).
 		WithCreator("generate-pdf", true).
-		WithSubject(r.Type, true).
+		WithSubject(r.Type, true)
+
+	// The report table needs one extra grid unit to keep its column proportions.
+	if r.Type == "laporan" {
+		builder = builder.WithMaxGridSize(reportGridSize)
+	}
+
+	cfg := builder.
 		WithPageNumber(props.PageNumber{
 			Pattern: "Halaman {current} dari {total}",
 			Place:   props.Bottom,
@@ -86,20 +93,21 @@ func addHeader(m core.Maroto, r data.Report) error {
 	}
 
 	qrPayload := fmt.Sprintf("https://example.com/report?doc=%s&seed=%d&type=%s", r.DocID, r.Seed, r.Type)
+	grid := m.GetCurrentConfig().MaxGridSize
 
 	titleRow := row.New(headerTitleHeight).Add(
-		col.New(gridSize).Add(text.New(r.Title, props.Text{Style: fontstyle.Bold, Size: 12})),
+		col.New(grid).Add(text.New(r.Title, props.Text{Style: fontstyle.Bold, Size: 12})),
 	)
 	infoRow := row.New(headerInfoHeight).Add(
 		code.NewQrCol(2, qrPayload, props.Rect{Center: true, Percent: 100}),
 		image.NewFromBytesCol(3, barcode, extension.Png, props.Rect{Center: true, Percent: 100}),
-		col.New(7).Add(text.New(r.DocID, props.Text{
+		col.New(grid-5).Add(text.New(r.DocID, props.Text{
 			Size:  documentIDFontSize,
 			Align: align.Right,
 			Top:   3,
 		})),
 	)
-	lineRow := row.New(headerLineHeight).Add(line.NewCol(gridSize))
+	lineRow := row.New(headerLineHeight).Add(line.NewCol(grid))
 
 	return m.RegisterHeader(titleRow, infoRow, lineRow)
 }
@@ -108,14 +116,14 @@ func addHeader(m core.Maroto, r data.Report) error {
 // page config, so they are not repeated here.
 func addFooter(m core.Maroto) error {
 	footerRow := row.New(5).Add(
-		col.New(gridSize).Add(text.New("generate-pdf", props.Text{Size: footerFontSize})),
+		col.New(m.GetCurrentConfig().MaxGridSize).Add(text.New("generate-pdf", props.Text{Size: footerFontSize})),
 	)
 	return m.RegisterFooter(footerRow)
 }
 
 // addTableHeader adds one bordered header row with a light background.
 func addTableHeader(m core.Maroto, titles []string, widths []int) error {
-	if err := validateTable(titles, widths); err != nil {
+	if err := validateTable(m, titles, widths); err != nil {
 		return err
 	}
 
@@ -139,7 +147,7 @@ func addTableHeader(m core.Maroto, titles []string, widths []int) error {
 
 // addTableRow adds one bordered data row.
 func addTableRow(m core.Maroto, cells []string, widths []int) error {
-	if err := validateTable(cells, widths); err != nil {
+	if err := validateTable(m, cells, widths); err != nil {
 		return err
 	}
 
@@ -186,17 +194,21 @@ func formatRupiah(value decimal.Decimal) string {
 }
 
 // validateTable checks that each cell has a width and that the widths fill the
-// 12-column maroto grid.
-func validateTable(cells []string, widths []int) error {
+// document grid; a nil document falls back to the default grid.
+func validateTable(m core.Maroto, cells []string, widths []int) error {
 	if len(cells) != len(widths) {
 		return fmt.Errorf("table: %d cells for %d widths", len(cells), len(widths))
+	}
+	maxGrid := gridSize
+	if m != nil {
+		maxGrid = m.GetCurrentConfig().MaxGridSize
 	}
 	sum := 0
 	for _, width := range widths {
 		sum += width
 	}
-	if sum != gridSize {
-		return fmt.Errorf("table: widths sum to %d, want %d", sum, gridSize)
+	if sum != maxGrid {
+		return fmt.Errorf("table: widths sum to %d, want %d", sum, maxGrid)
 	}
 	return nil
 }

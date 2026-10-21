@@ -7,15 +7,15 @@ var spellNumbers = [...]string{
 	"enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas",
 }
 
-// NumberWords spells a number in Indonesian words without the word "rupiah".
+// Terbilang spells a number in Indonesian words without the word "rupiah".
 // Supported range: up to trillions.
-func NumberWords(n int64) string {
+func Terbilang(n int64) string {
 	if n == 0 {
 		return "nol"
 	}
 	if n < 0 {
 		// shortcut: negating math.MinInt64 overflows; document amounts never get that large.
-		return "minus " + NumberWords(-n)
+		return "minus " + Terbilang(-n)
 	}
 	return strings.Join(strings.Fields(spell(n)), " ")
 }
