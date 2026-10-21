@@ -67,7 +67,11 @@ func LoadBatch(path string, base Config) ([]Job, error) {
 			job.Seed = *entry.Seed
 		}
 		if job.Title == "" {
-			job.Title = typeDefaults[job.Type].title
+			if base.Provided("title") {
+				job.Title = base.Title
+			} else {
+				job.Title = typeDefaults[job.Type].title
+			}
 		}
 		job.Out = OutputPath(base.OutDir, job.Out)
 		if job.Out == "" {

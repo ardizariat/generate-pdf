@@ -173,3 +173,15 @@ func TestDefaultOutputName(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, name, other, "uuid v7 harus unik")
 }
+
+func TestLoadBatchInheritsProvidedTitle(t *testing.T) {
+	t.Chdir(t.TempDir())
+	base, err := Load(newCommand(t, "--type", TypeReceipt, "--seed", "9", "--title", "Judul Global"))
+	require.NoError(t, err)
+
+	path := writeManifest(t, "jobs:\n  - pages: 1\n")
+	jobs, err := LoadBatch(path, base)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, "Judul Global", jobs[0].Title)
+}
