@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -18,7 +19,8 @@ type Job struct {
 	Title string
 }
 
-// manifest is the YAML shape of a batch file; unknown fields are ignored.
+// manifest is the YAML shape of a batch file; unknown fields are rejected so a
+// typo fails before any file is written.
 type manifest struct {
 	Jobs []jobEntry `yaml:"jobs"`
 }
@@ -41,7 +43,9 @@ func LoadBatch(path string, base Config) ([]Job, error) {
 	}
 
 	var m manifest
-	if err := yaml.Unmarshal(content, &m); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(content))
+	dec.KnownFields(true)
+	if err := dec.Decode(&m); err != nil {
 		return nil, fmt.Errorf("parse manifest %s: %w", path, err)
 	}
 	if len(m.Jobs) == 0 {

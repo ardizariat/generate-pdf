@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -71,10 +72,11 @@ func TestLoadBatchInheritsFlags(t *testing.T) {
 	assert.Equal(t, "Kuitansi", jobs[0].Title)
 }
 
-func TestLoadBatchIgnoresUnknownFields(t *testing.T) {
-	path := writeManifest(t, "jobs:\n  - type: invoice\n    warna: biru\n")
+func TestLoadBatchRejectsUnknownFields(t *testing.T) {
+	path := writeManifest(t, "jobs:\n  - type: invoice\n    page: 2\n")
 	_, err := LoadBatch(path, Config{Type: TypeInvoice, Seed: 42})
-	assert.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "field page not found")
 }
 
 func TestLoadBatchErrors(t *testing.T) {
@@ -138,13 +140,14 @@ func TestSupportsMultiPage(t *testing.T) {
 }
 
 func TestLoadBatchResolvesOutDir(t *testing.T) {
-	path := writeManifest(t, `jobs:
+	abs := filepath.Join(t.TempDir(), "custom.pdf")
+	path := writeManifest(t, fmt.Sprintf(`jobs:
   - type: invoice
   - type: invoice
     out: sub/custom.pdf
   - type: invoice
-    out: /abs/custom.pdf
-`)
+    out: %q
+`, abs))
 
 	base := Config{Type: TypeInvoice, Seed: 42, OutDir: "output"}
 	jobs, err := LoadBatch(path, base)
@@ -153,14 +156,15 @@ func TestLoadBatchResolvesOutDir(t *testing.T) {
 
 	requireDefaultName(t, jobs[0].Out, "output", TypeInvoice)
 	assert.Equal(t, filepath.Join("output", "sub", "custom.pdf"), jobs[1].Out)
-	assert.Equal(t, "/abs/custom.pdf", jobs[2].Out)
+	assert.Equal(t, abs, jobs[2].Out)
 }
 
 func TestOutputPath(t *testing.T) {
-	assert.Equal(t, "output/a.pdf", OutputPath("output", "a.pdf"))
+	abs := filepath.Join(t.TempDir(), "a.pdf")
+	assert.Equal(t, filepath.Join("output", "a.pdf"), OutputPath("output", "a.pdf"))
 	assert.Equal(t, "", OutputPath("output", ""))
 	assert.Equal(t, "a.pdf", OutputPath("", "a.pdf"))
-	assert.Equal(t, "/abs/a.pdf", OutputPath("output", "/abs/a.pdf"))
+	assert.Equal(t, abs, OutputPath("output", abs))
 }
 
 func TestDefaultOutputName(t *testing.T) {
