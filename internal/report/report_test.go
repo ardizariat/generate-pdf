@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,8 +84,61 @@ func TestCoreVerifyFailureIsNotSilent(t *testing.T) {
 	r, err := data.Generate("invoice", 8, 42)
 	require.NoError(t, err)
 
-	pages, _, err := Generate(r, filepath.Join(t.TempDir(), "invoice.pdf"), true)
+	dir := t.TempDir()
+	out := filepath.Join(dir, "invoice.pdf")
+	pages, _, err := Generate(r, out, true)
 	require.Error(t, err)
 	assert.Zero(t, pages)
 	assert.Contains(t, err.Error(), "verifikasi")
+
+	_, statErr := os.Stat(out)
+	assert.True(t, errors.Is(statErr, os.ErrNotExist), "file gagal tidak boleh tercipta: %v", statErr)
+	leftovers, err := filepath.Glob(filepath.Join(dir, ".pdfgen-*"))
+	require.NoError(t, err)
+	assert.Empty(t, leftovers, "file sementara harus dibersihkan")
+}
+
+func TestCoreVerifyFailureKeepsExistingFile(t *testing.T) {
+	original := verifyPDF
+	verifyPDF = func(string) (int, error) {
+		return 0, errors.New("rusak")
+	}
+	t.Cleanup(func() { verifyPDF = original })
+
+	r, err := data.Generate("invoice", 8, 42)
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	out := filepath.Join(dir, "invoice.pdf")
+	old := []byte("%PDF-lama")
+	require.NoError(t, os.WriteFile(out, old, 0o600))
+
+	_, _, err = Generate(r, out, true)
+	require.Error(t, err)
+
+	content, err := os.ReadFile(out)
+	require.NoError(t, err)
+	assert.Equal(t, old, content, "file lama tidak boleh tersentuh saat verifikasi gagal")
+	info, err := os.Stat(out)
+	require.NoError(t, err)
+	if runtime.GOOS != "windows" {
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
+}
+
+func TestCoreGeneratePagesFailureLeavesNoFile(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "two.pdf")
+	build := func(int) (data.Report, error) {
+		return data.Generate("kuitansi", 0, 42)
+	}
+
+	_, _, _, err := GeneratePages(build, out, 2, true)
+	require.Error(t, err)
+
+	_, statErr := os.Stat(out)
+	assert.True(t, errors.Is(statErr, os.ErrNotExist), "file gagal tidak boleh tercipta: %v", statErr)
+	leftovers, err := filepath.Glob(filepath.Join(dir, ".pdfgen-*"))
+	require.NoError(t, err)
+	assert.Empty(t, leftovers, "file sementara harus dibersihkan")
 }

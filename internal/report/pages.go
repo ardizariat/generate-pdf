@@ -94,12 +94,21 @@ func GeneratePages(build func(rows int) (data.Report, error), out string, target
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("buat data %d baris: %w", lo, err)
 	}
-	pages, size, err = Generate(r, out, verify)
+	staged, err := stagePath(out)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("buat file sementara untuk %s: %w", out, err)
+	}
+	defer func() { _ = os.Remove(staged) }()
+
+	pages, size, err = generate(r, staged, out, verify)
 	if err != nil {
 		return 0, 0, 0, err
 	}
 	if pages != targetPages {
 		return 0, 0, 0, fmt.Errorf("target %d halaman tidak tercapai (%s berisi %d halaman)", targetPages, out, pages)
+	}
+	if err := commit(staged, out); err != nil {
+		return 0, 0, 0, fmt.Errorf("simpan %s: %w", out, err)
 	}
 	return lo, pages, size, nil
 }
