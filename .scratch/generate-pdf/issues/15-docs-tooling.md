@@ -26,3 +26,11 @@ Type: task
 ## Out of scope
 
 CI pipeline, Dockerfile, dokumentasi arsitektur terpisah.
+
+## Comments
+
+- Selesai. `README.md` dan `Makefile` dibuat; `.golangci.yml` menambah `unused`; `.gitignore` memuat `/pdfgen`, `/*.pdf`, `/dist`.
+- Verifikasi: `make build` (menghasilkan `./pdfgen`), `make test`, `make fmt` lulus; `golangci-lint run` 0 issue (v2.15.0).
+- `make build` menjalankan `go build ./...` lalu `go build -o pdfgen ./cmd/pdfgen` agar binary build nyata tersedia.
+- `GENPDF_CONFIG` diimplementasikan di `config.readConfigFile` (flag `--config` menang) supaya presedensi flag > env > file > default berlaku seragam.
+

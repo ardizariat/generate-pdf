@@ -159,6 +159,8 @@ func validationMessage(fieldErr validator.FieldError) string {
 func readConfigFile(v *viper.Viper, cmd *cobra.Command) error {
 	if flagChanged(cmd, "config") {
 		v.SetConfigFile(cmd.Flags().Lookup("config").Value.String())
+	} else if path := os.Getenv(envPrefix + "_CONFIG"); path != "" {
+		v.SetConfigFile(path)
 	} else {
 		v.SetConfigName(configName)
 		v.SetConfigType("yaml")

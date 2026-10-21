@@ -181,6 +181,28 @@ func TestProvidedConfigFlag(t *testing.T) {
 	assert.Equal(t, TypeReceipt, cfg.Type)
 }
 
+func TestLoadConfigPathFromEnv(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	envPath := filepath.Join(dir, "from-env.yaml")
+	require.NoError(t, os.WriteFile(envPath, []byte("type: kuitansi\n"), 0o644))
+	t.Setenv("GENPDF_CONFIG", envPath)
+
+	cfg, err := Load(newCommand(t))
+	require.NoError(t, err)
+	assert.Equal(t, envPath, cfg.ConfigPath)
+	assert.Equal(t, TypeReceipt, cfg.Type)
+
+	flagPath := filepath.Join(dir, "from-flag.yaml")
+	require.NoError(t, os.WriteFile(flagPath, []byte("type: laporan\n"), 0o644))
+
+	cfg, err = Load(newCommand(t, "--config", flagPath))
+	require.NoError(t, err)
+	assert.Equal(t, flagPath, cfg.ConfigPath, "flag beats GENPDF_CONFIG")
+	assert.Equal(t, TypeReport, cfg.Type)
+}
+
 func TestLoadMissingConfigFileIsNotError(t *testing.T) {
 	t.Chdir(t.TempDir())
 

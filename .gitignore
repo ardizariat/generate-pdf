@@ -1,6 +1,8 @@
 # binary hasil build
-/generate-pdf
 /pdfgen
 
 # output PDF di root
 /*.pdf
+
+# artefak distribusi
+/dist
