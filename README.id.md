@@ -12,10 +12,25 @@ dibuka di pembaca PDF biasa dan lolos pemeriksaan `pdfcpu`.
 Dengan `seed` yang sama, isi PDF selalu sama, sehingga hasilnya bisa diulang untuk
 pengujian. Nama file tetap berbeda tiap kali generate supaya tidak saling menimpa.
 
+## Status
+
+Tahap awal (`v0.1.x`). CLI dan format manifest dapat berubah pada rilis minor; pin
+versi rilis bila membutuhkan antarmuka yang stabil. Project dikelola oleh satu orang
+dengan dukungan best-effort, dan hanya rilis terbaru yang menerima perbaikan. Pesan
+CLI memakai bahasa Indonesia; dokumentasi tersedia dalam bahasa Inggris dan Indonesia.
+
+## Versi dan kompatibilitas
+
+Rilis memakai Semantic Versioning. Selama versi masih di bawah `1.0`, rilis minor
+dapat memuat perubahan yang tidak kompatibel pada CLI atau manifest; rilis patch
+berisi perbaikan. Hanya rilis terbaru yang didukung, sesuai [SECURITY.md](SECURITY.md).
+
 ## Persyaratan dan instalasi
 
-- Go 1.26.1 atau lebih baru bila membangun dari source.
-- Binary rilis tidak membutuhkan runtime tambahan.
+- Go 1.26.10 atau lebih baru bila membangun dari source.
+- Binary rilis tersedia untuk Linux, macOS, dan Windows pada `amd64` dan `arm64`;
+  tidak membutuhkan runtime tambahan.
+- Folder output harus dapat ditulis. Aplikasi tidak melakukan akses jaringan.
 
 Unduh arsip sesuai OS dari [Releases](https://github.com/ardizariat/generate-pdf/releases),
 atau instal dengan Go:
@@ -34,6 +49,13 @@ Cek versi:
 
 ```bash
 pdfgen --version
+```
+
+Setiap rilis juga menyertakan `checksums.txt`. Untuk memverifikasi arsip unduhan:
+
+```bash
+sha256sum -c checksums.txt --ignore-missing   # Linux
+shasum -a 256 -c checksums.txt                # macOS
 ```
 
 ![Contoh invoice](assets/preview.png)
@@ -105,6 +127,22 @@ Menimpa file yang sudah ada hanya dengan `--force`.
 `--rows` hanya berpengaruh pada `invoice`, `laporan`, dan `surat-jalan`; untuk jenis
 lain nilainya diabaikan.
 
+## Batasan yang diketahui
+
+- Data, mata uang, dan konvensi dokumen hanya untuk Indonesia.
+- `surat-resmi`, `kuitansi`, dan `sertifikat` selalu 1 halaman. Target halaman pasti
+  hanya tersedia untuk dokumen bertabel, dan hanya di mode batch.
+- Layout bersifat tetap. Tidak ada template, logo, font kustom, enkripsi PDF, atau
+  tanda tangan digital.
+- Pencarian target halaman dibatasi 2000 baris tabel; target yang lebih besar akan
+  gagal, bukan berjalan tanpa henti.
+- Mode interaktif mengabaikan `--rows` dan `--out`.
+- Kolom manifest yang tidak dikenal ditolak; key file konfigurasi yang tidak dikenal
+  diabaikan.
+- Nama file memuat timestamp dan UUID sehingga tidak deterministik. Gunakan `--out`
+  atau `out` di manifest bila membutuhkan path yang dapat diprediksi.
+- Tidak tersedia binary 32-bit.
+
 ## Flag
 
 | Flag | Default | Keterangan |
@@ -118,7 +156,7 @@ lain nilainya diabaikan.
 | `--batch` | kosong | Path manifest YAML berisi daftar job; bila diisi, mode batch dan prompt dilewati |
 | `--no-input` | `false` | Matikan prompt interaktif |
 | `--force` | `false` | Izinkan menimpa file output yang sudah ada |
-| `--verify` | `false` | Validasi PDF dengan pdfcpu setelah file ditulis |
+| `--verify` | `false` | Validasi PDF dengan pdfcpu sebelum file final ditulis |
 | `-v, --verbose` | `false` | Log level `info` (default `warn`) |
 | `--config` | kosong | Path file konfigurasi eksplisit |
 | `--version` | | Tampilkan versi |
@@ -242,7 +280,9 @@ pdfgen --batch jobs.yaml --no-input
   `--out-dir`, sedangkan path absolut dipakai apa adanya.
 - **`--force`, `--verify`, dan `-v` berlaku untuk semua entri.** Tanpa `--force`, file
   yang sudah ada tidak ditimpa.
-- **Kolom yang tidak dikenal diabaikan**, dan batch tidak pernah menampilkan form.
+- **Kolom yang tidak dikenal ditolak** dengan error sebelum file apa pun ditulis,
+  sehingga typo seperti `page:` alih-alih `pages:` langsung ketahuan. Batch tidak
+  pernah menampilkan form.
 
 ### Cara membaca hasilnya
 
@@ -268,9 +308,12 @@ ringkasan: 3 sukses, 0 gagal
 - Bila file tujuan sudah ada, generate **ditolak** dengan error yang menyebut path dan
   cara mengizinkannya. `--force` mengizinkan penimpaan. Pada batch, hanya job itu yang
   gagal dan job lain tetap berjalan.
-- `--verify` memvalidasi hasil dengan pdfcpu setelah file ditulis; verifikasi gagal
-  berarti generate gagal. Jumlah halaman selalu dihitung (lewat pdfcpu) sebagai bagian
-  dari proses generate, terlepas dari `--verify`.
+- `--verify` memvalidasi hasil sementara dengan pdfcpu sebelum menggantikan file
+  tujuan; verifikasi gagal berarti generate gagal. Jumlah halaman selalu dihitung
+  (lewat pdfcpu) sebagai bagian dari proses generate, terlepas dari `--verify`.
+- Setiap PDF ditulis ke file sementara di folder tujuan lalu di-rename hanya setelah
+  render (dan verifikasi bila `--verify` dipakai) berhasil. Kegagalan tidak
+  meninggalkan file parsial dan tidak mengganti file lama.
 - Generate baru dinyatakan berhasil setelah file selesai ditulis.
 
 ## Determinisme
@@ -296,6 +339,35 @@ Contoh PDF dengan seed tetap:
 | Surat jalan | [examples/surat-jalan.pdf](examples/surat-jalan.pdf) |
 | Sertifikat | [examples/sertifikat.pdf](examples/sertifikat.pdf) |
 
+## Dependensi
+
+Modul runtime (dependency langsung; dependency tidak langsung tercatat di `go.mod`
+dan `go.sum`, yang menjadi inventaris resmi):
+
+| Modul | Fungsi |
+|---|---|
+| `spf13/cobra` | command dan flag CLI |
+| `spf13/viper` | file konfigurasi dan environment variable |
+| `charm.land/huh/v2` | form interaktif |
+| `charm.land/lipgloss/v2` | styling terminal |
+| `go.uber.org/zap` | structured logging |
+| `johnfercher/maroto/v2` | layout PDF |
+| `phpdave11/gofpdf` | katalog dan metadata PDF deterministik |
+| `pdfcpu/pdfcpu` | validasi PDF dan penghitungan halaman |
+| `boombuler/barcode` | pembuatan barcode dan QR |
+| `brianvoe/gofakeit/v7` | nama dan alamat fiktif |
+| `google/uuid` | ID dokumen dan nama file unik |
+| `shopspring/decimal` | aritmetika uang |
+| `go-playground/validator/v10` | validasi konfigurasi |
+| `go.yaml.in/yaml/v3` | parsing manifest batch |
+
+Peralatan development dan rilis:
+
+- Go 1.26.10+ dan `golangci-lint` v2 untuk pemeriksaan lokal.
+- `testify` untuk test (hanya dependency test).
+- [goreleaser](https://goreleaser.com/) v2 untuk arsip rilis (hanya workflow rilis).
+- `govulncheck` melalui `go run` untuk `make vuln` dan CI.
+
 ## Menjalankan test
 
 ```bash
@@ -304,6 +376,7 @@ make test    # go test ./... -count=1
 make fmt     # gofmt -w .
 make lint    # golangci-lint run (govet, errcheck, staticcheck, gofmt, unused)
 make race    # go test -race ./... -count=1
+make vuln    # govulncheck ./...
 make run     # go run ./cmd/pdfgen
 ```
 
@@ -315,10 +388,23 @@ go vet ./...
 gofmt -l .
 ```
 
+CI menjalankan test di Linux, macOS, dan Windows; race detector, lint, dan pemeriksaan
+kerentanan hanya di Linux.
+
+## Melaporkan bug dan meminta fitur
+
+- **Bug:** buka issue di
+  <https://github.com/ardizariat/generate-pdf/issues/new/choose> dan sertakan perintah
+  yang dijalankan, hasil yang diharapkan dan yang terjadi, serta versi OS/Go.
+- **Permintaan fitur:** gunakan halaman issue yang sama dan jelaskan kebutuhan serta
+  workaround yang sedang dipakai.
+- **Masalah keamanan:** jangan buka issue publik; ikuti [SECURITY.md](SECURITY.md).
+
 ## Kontribusi dan keamanan
 
-Baca [CONTRIBUTING.md](CONTRIBUTING.md) sebelum membuka pull request. Laporkan
-masalah keamanan secara privat sesuai [SECURITY.md](SECURITY.md).
+Baca [CONTRIBUTING.md](CONTRIBUTING.md) sebelum membuka pull request. Dengan
+berpartisipasi, Anda setuju mengikuti [Code of Conduct](CODE_OF_CONDUCT.md).
+Laporkan masalah keamanan secara privat sesuai [SECURITY.md](SECURITY.md).
 
 ## Lisensi
 

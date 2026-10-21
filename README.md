@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ardizariat/generate-pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/ardizariat/generate-pdf/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Go 1.26.1](https://img.shields.io/badge/go-1.26.1-00ADD8?logo=go)](go.mod)
+[![Go 1.26.10](https://img.shields.io/badge/go-1.26.10-00ADD8?logo=go)](go.mod)
 
 `pdfgen` is a small CLI that generates realistic **dummy PDFs** for six common
 Indonesian office documents: invoices, formal letters, reports, receipts, delivery
@@ -14,7 +14,22 @@ a staging folder without touching real customer data.
 
 [Versi bahasa Indonesia](README.id.md)
 
+## Status
+
+Early development (`v0.1.x`). The CLI and manifest format may change in minor
+releases; pin a release if you need a stable interface. The project is maintained
+by one person on a best-effort basis.
+
+CLI messages are in Indonesian; the documentation is English with an Indonesian
+translation.
+
 ![Invoice example](assets/preview.png)
+
+## Versioning
+
+Releases use Semantic Versioning. While the version is below `1.0`, minor releases
+may include breaking CLI or manifest changes; patch releases contain fixes. Only the
+latest release is supported, as described in [SECURITY.md](SECURITY.md).
 
 ## Features
 
@@ -31,8 +46,10 @@ a staging folder without touching real customer data.
 
 ## Requirements
 
-- Go 1.26.1 or newer when building from source.
-- Prebuilt binaries need no runtime dependencies.
+- Go 1.26.10 or newer when building from source.
+- Prebuilt binaries are available for Linux, macOS, and Windows on `amd64` and
+  `arm64`; they need no runtime dependencies.
+- A writable output folder. `pdfgen` makes no network requests.
 
 ## Installation
 
@@ -53,6 +70,13 @@ Check the installed version:
 
 ```bash
 pdfgen --version
+```
+
+Every release also publishes `checksums.txt`. To verify a downloaded archive:
+
+```bash
+sha256sum -c checksums.txt --ignore-missing   # Linux
+shasum -a 256 -c checksums.txt                # macOS
 ```
 
 ## Quick start
@@ -88,6 +112,21 @@ output/invoice_20261021T141530Z_0192f3a4-5b6c-7d8e-9f00-112233445566.pdf
 `--rows` only affects `invoice`, `laporan`, and `surat-jalan`; it is ignored for the
 other types.
 
+## Known limitations
+
+- Data, currency, and document conventions are Indonesian only.
+- `surat-resmi`, `kuitansi`, and `sertifikat` are always one page. Exact page
+  targets are available only for table documents, and only in batch mode.
+- Layouts are fixed. There are no custom templates, logos, fonts, PDF encryption,
+  or digital signatures.
+- The page-target search is capped at 2000 table rows; larger targets fail instead
+  of rendering indefinitely.
+- Interactive mode ignores `--rows` and `--out`.
+- Unknown manifest fields are rejected; unknown configuration-file keys are ignored.
+- File names include a timestamp and UUID, so they are not deterministic. Use
+  `--out` or a manifest `out` when you need a predictable path.
+- No 32-bit binaries are published.
+
 ## Flags
 
 | Flag | Default | Description |
@@ -101,7 +140,7 @@ other types.
 | `--batch` | empty | YAML manifest of jobs; disables prompts |
 | `--no-input` | `false` | Disable the interactive form |
 | `--force` | `false` | Allow overwriting an existing output file |
-| `--verify` | `false` | Validate the PDF with pdfcpu after writing |
+| `--verify` | `false` | Validate the PDF with pdfcpu before it is finalized |
 | `-v, --verbose` | `false` | Info-level logs (default is `warn`) |
 | `--config` | empty | Explicit configuration file |
 | `--version` | | Print the version |
@@ -255,7 +294,9 @@ pdfgen --batch jobs.yaml --no-input
   against `--out-dir`, while absolute paths are used as-is.
 - **`--force`, `--verify`, and `-v` apply to every entry.** Without `--force`,
   existing files are not overwritten.
-- Unknown fields are ignored, and batch mode never shows a prompt.
+- **Unknown fields are rejected** with an error before any file is written, so a
+  typo such as `page:` instead of `pages:` fails fast. Batch mode never shows a
+  prompt.
 
 ### Reading the result
 
@@ -284,9 +325,12 @@ ringkasan: 3 sukses, 0 gagal
 - If the target file exists, generation is **rejected** with an error naming the path
   and how to allow it. `--force` allows overwriting. In batch mode only that job
   fails; the others continue.
-- `--verify` validates the result with pdfcpu after writing; a failed verification
-  fails the job. Page counts are always measured with pdfcpu as part of generation,
-  regardless of `--verify`.
+- `--verify` validates the staged result with pdfcpu before it replaces the
+  destination; a failed verification fails the job. Page counts are always measured
+  with pdfcpu as part of generation, regardless of `--verify`.
+- Each PDF is written to a temporary file in the destination folder and renamed
+  only after rendering (and verification when `--verify` is used) succeeds. A
+  failed run does not leave a partial file or replace an existing one.
 - Generation is only reported as successful after the file has been fully written.
 
 ## Determinism
@@ -313,6 +357,35 @@ Sample outputs generated with fixed seeds:
 | Delivery note | [examples/surat-jalan.pdf](examples/surat-jalan.pdf) |
 | Certificate | [examples/sertifikat.pdf](examples/sertifikat.pdf) |
 
+## Dependencies
+
+Runtime modules (direct dependencies; indirect ones are recorded in `go.mod` and
+`go.sum`, which are the canonical inventory):
+
+| Module | Purpose |
+|---|---|
+| `spf13/cobra` | CLI commands and flags |
+| `spf13/viper` | configuration file and environment variables |
+| `charm.land/huh/v2` | interactive form |
+| `charm.land/lipgloss/v2` | terminal styling |
+| `go.uber.org/zap` | structured logging |
+| `johnfercher/maroto/v2` | PDF layout |
+| `phpdave11/gofpdf` | deterministic PDF catalog and metadata |
+| `pdfcpu/pdfcpu` | PDF validation and page counting |
+| `boombuler/barcode` | barcode and QR generation |
+| `brianvoe/gofakeit/v7` | fictional names and addresses |
+| `google/uuid` | document IDs and unique file names |
+| `shopspring/decimal` | money arithmetic |
+| `go-playground/validator/v10` | configuration validation |
+| `go.yaml.in/yaml/v3` | batch manifest parsing |
+
+Development and release tools:
+
+- Go 1.26.10+ and `golangci-lint` v2 for local checks.
+- `testify` for tests (test-only dependency).
+- [goreleaser](https://goreleaser.com/) v2 for release archives (release workflow only).
+- `govulncheck` through `go run` for `make vuln` and CI.
+
 ## Development
 
 ```bash
@@ -321,14 +394,26 @@ make test    # go test ./... -count=1
 make fmt     # gofmt -w .
 make lint    # golangci-lint run (govet, errcheck, staticcheck, gofmt, unused)
 make race    # go test -race ./... -count=1
+make vuln    # govulncheck ./...
 make run     # go run ./cmd/pdfgen
 ```
 
 `make lint` requires `golangci-lint` v2. Without it, run `go vet ./...` and
-`gofmt -l .`.
+`gofmt -l .`. CI runs the test suite on Linux, macOS, and Windows; race detection,
+lint, and vulnerability checks run on Linux.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Report security
-issues privately as described in [SECURITY.md](SECURITY.md).
+## Getting help
+
+- **Bug:** open an issue at
+  <https://github.com/ardizariat/generate-pdf/issues/new/choose> with the command
+  you ran, expected and actual output, and your OS/Go version.
+- **Feature request:** use the same issue chooser and explain the use case and any
+  workaround you currently use.
+- **Security issue:** do not open a public issue; follow [SECURITY.md](SECURITY.md).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. By
+participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Report security issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
