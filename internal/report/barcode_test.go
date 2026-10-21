@@ -22,6 +22,12 @@ func TestBarcodePNGProducesValidPNG(t *testing.T) {
 	assert.Equal(t, barcodeHeight, img.Bounds().Dy())
 }
 
+func TestBarcodePNGFitsDocumentID(t *testing.T) {
+	// A 36-character UUID needs more than 300px, so the width must stay above it.
+	_, err := BarcodePNG("0f8b4c1e-9a2d-5b7e-8c3f-1d2e3f4a5b6c")
+	require.NoError(t, err)
+}
+
 func TestBarcodePNGRejectsInvalidInput(t *testing.T) {
 	tests := []struct {
 		name  string

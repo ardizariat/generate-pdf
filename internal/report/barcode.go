@@ -12,11 +12,11 @@ import (
 )
 
 const (
-	barcodeWidth  = 300
-	barcodeHeight = 60
+	barcodeWidth  = 500
+	barcodeHeight = 100
 )
 
-// BarcodePNG renders value as a Code 128 barcode scaled to 300x60 and
+// BarcodePNG renders value as a Code 128 barcode scaled to 500x100 and
 // encoded as PNG. Code 128 only supports ASCII, so empty or non-ASCII
 // input is rejected.
 func BarcodePNG(value string) ([]byte, error) {
