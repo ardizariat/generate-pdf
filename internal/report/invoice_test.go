@@ -11,10 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 func TestInvoiceLayout(t *testing.T) {
-	r, err := data.Generate("invoice", 8, 42)
+	r, err := data.Generate("invoice", 8, 42, locale.English)
 	require.NoError(t, err)
 
 	m, err := newDocument(r)
@@ -34,7 +35,7 @@ func TestInvoiceLayout(t *testing.T) {
 }
 
 func TestInvoiceTotals(t *testing.T) {
-	r, err := data.Generate("invoice", 8, 42)
+	r, err := data.Generate("invoice", 8, 42, locale.English)
 	require.NoError(t, err)
 
 	assert.True(t, r.InvoiceTotals.Total.Equal(r.InvoiceTotals.Subtotal.Add(r.InvoiceTotals.Tax)),
@@ -43,7 +44,7 @@ func TestInvoiceTotals(t *testing.T) {
 	assert.Len(t, r.InvoiceItems, 8)
 }
 
-func TestInvoiceFormatRupiah(t *testing.T) {
+func TestFormatRupiah(t *testing.T) {
 	tests := []struct {
 		name  string
 		value decimal.Decimal
@@ -58,7 +59,7 @@ func TestInvoiceFormatRupiah(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, formatRupiah(tt.value))
+			assert.Equal(t, tt.want, locale.FormatMoney(locale.Indonesian, tt.value))
 		})
 	}
 }

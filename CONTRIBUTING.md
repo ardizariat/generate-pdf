@@ -42,13 +42,17 @@ CI runs tests on Linux, macOS, and Windows; race detection, lint, formatting,
 | `cmd/pdfgen` | entry point and exit codes |
 | `internal/cli` | Cobra commands, flags, generation flow, progress |
 | `internal/config` | Viper loading, defaults, manifest parsing, validation |
+| `internal/locale` | locale labels, dates, money, number words |
 | `internal/prompt` | interactive form |
 | `internal/logging` | Zap logger construction |
-| `internal/data` | fictional data, document payloads, `terbilang` |
+| `internal/data` | fictional data per locale, document payloads, number words |
 | `internal/report` | PDF layout, rendering, verification, atomic output |
 
-Dependencies point downward: `cmd` → `cli` → (`config`, `prompt`, `logging`, `data`,
-`report`). `data` and `report` must not import Cobra, Viper, or Huh.
+The module root (`pdfgen.go`) exposes the thin public API (`Options`, `Result`,
+`Render`, `Generate`) and maps onto the same `config`, `data`, and `report` packages.
+
+Dependencies point downward: `cmd` → `cli` → (`config`, `prompt`, `logging`, `locale`,
+`data`, `report`). `data` and `report` must not import Cobra, Viper, or Huh.
 
 ## Guidelines
 
@@ -61,8 +65,12 @@ Dependencies point downward: `cmd` → `cli` → (`config`, `prompt`, `logging`,
 - New behavior needs a test. Bug fixes need a test that fails before the fix.
 - Do not add a dependency for something the standard library or an existing
   dependency already does. Open an issue first if a new dependency is unavoidable.
-- Keep user-facing CLI messages in Indonesian; documentation is English with an
-  Indonesian translation.
+- CLI help, flag descriptions, and errors stay English. Runtime prompts, progress,
+  summaries, and PDF content follow `--lang`; keep both locales in sync when you add
+  user-facing text.
+- Document slugs stay English in every locale. Adding a locale means extending
+  `internal/locale` and `internal/data`, not duplicating layouts.
+- Keep `README.md` English and `README.id.md` Indonesian.
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`,
   `refactor:`, `chore:`).
 
@@ -132,8 +140,10 @@ then squash-merge and delete the branch. Dependabot PRs use the same path.
 1. `main` is green and the working tree is clean.
 2. Run `make test`, `make race`, `make lint`, and `make vuln` locally.
 3. Update documentation if flags, behavior, Go version, or dependencies changed.
-4. Create and push a SemVer tag, for example `git tag -a v0.1.0 -m v0.1.0` and
-   `git push origin v0.1.0`. The release workflow runs GoReleaser, builds Linux,
-   macOS, and Windows archives for `amd64`/`arm64`, and publishes `checksums.txt`.
+4. Create and push a SemVer tag, for example `git tag -a v0.2.0 -m v0.2.0` and
+   `git push origin v0.2.0`. The release workflow first runs the reusable CI workflow
+   (`.github/workflows/ci.yml`) as a required `ci` job, then GoReleaser builds Linux,
+   macOS, and Windows archives for `amd64`/`arm64` and publishes `checksums.txt`.
+   Never move or re-create a published tag; cut a new patch release instead.
 5. Check the generated GitHub release notes, archives, and checksums. Only the
    latest release is supported, so note breaking changes in the release notes.

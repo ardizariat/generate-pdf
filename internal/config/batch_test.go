@@ -21,7 +21,7 @@ func writeManifest(t *testing.T, content string) string {
 
 func TestLoadBatchResolvesDefaults(t *testing.T) {
 	path := writeManifest(t, `jobs:
-  - type: laporan
+  - type: report
   - out: custom.pdf
 `)
 
@@ -33,14 +33,14 @@ func TestLoadBatchResolvesDefaults(t *testing.T) {
 	assert.Equal(t, TypeReport, jobs[0].Type)
 	assert.Equal(t, 1, jobs[0].Pages)
 	assert.Equal(t, uint64(42), jobs[0].Seed)
-	assert.Equal(t, "Laporan", jobs[0].Title)
+	assert.Equal(t, "Report", jobs[0].Title)
 	requireDefaultName(t, jobs[0].Out, "", TypeReport)
 	assert.Equal(t, Job{Type: TypeInvoice, Pages: 1, Seed: 42, Out: "custom.pdf", Title: "Invoice"}, jobs[1])
 }
 
 func TestLoadBatchJobOverridesGlobal(t *testing.T) {
 	path := writeManifest(t, `jobs:
-  - type: surat-jalan
+  - type: delivery-note
     pages: 3
     seed: 7
     out: a.pdf
@@ -69,7 +69,7 @@ func TestLoadBatchInheritsFlags(t *testing.T) {
 	assert.Equal(t, TypeReceipt, jobs[0].Type)
 	assert.Equal(t, uint64(9), jobs[0].Seed)
 	requireDefaultName(t, jobs[0].Out, "output", TypeReceipt)
-	assert.Equal(t, "Kuitansi", jobs[0].Title)
+	assert.Equal(t, "Receipt", jobs[0].Title)
 }
 
 func TestLoadBatchRejectsUnknownFields(t *testing.T) {
@@ -85,13 +85,13 @@ func TestLoadBatchErrors(t *testing.T) {
 		content string
 		want    []string
 	}{
-		{name: "empty jobs", content: "jobs: []\n", want: []string{"jobs kosong"}},
+		{name: "empty jobs", content: "jobs: []\n", want: []string{"jobs is empty"}},
 		{name: "invalid yaml", content: "jobs: [\n", want: []string{"parse manifest"}},
 		{name: "zero pages", content: "jobs:\n  - type: invoice\n    pages: 0\n", want: []string{"job 1", "Pages=0"}},
 		{name: "unknown type", content: "jobs:\n  - type: faktur\n", want: []string{"job 1", "faktur"}},
-		{name: "letter multi page", content: "jobs:\n  - type: surat-resmi\n    pages: 2\n", want: []string{"surat-resmi", "maksimal 1"}},
-		{name: "receipt multi page", content: "jobs:\n  - type: kuitansi\n    pages: 2\n", want: []string{"kuitansi", "maksimal 1"}},
-		{name: "certificate multi page", content: "jobs:\n  - type: sertifikat\n    pages: 2\n", want: []string{"sertifikat", "maksimal 1"}},
+		{name: "letter multi page", content: "jobs:\n  - type: letter\n    pages: 2\n", want: []string{"letter", "max 1"}},
+		{name: "receipt multi page", content: "jobs:\n  - type: receipt\n    pages: 2\n", want: []string{"receipt", "max 1"}},
+		{name: "certificate multi page", content: "jobs:\n  - type: certificate\n    pages: 2\n", want: []string{"certificate", "max 1"}},
 	}
 
 	for _, tc := range tests {
@@ -109,16 +109,16 @@ func TestLoadBatchErrors(t *testing.T) {
 func TestLoadBatchMissingFile(t *testing.T) {
 	_, err := LoadBatch(filepath.Join(t.TempDir(), "missing.yaml"), Config{Type: TypeInvoice})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "baca manifest")
+	assert.Contains(t, err.Error(), "read manifest")
 }
 
 func TestLoadBatchAcceptsMultiPageTableTypes(t *testing.T) {
 	path := writeManifest(t, `jobs:
   - type: invoice
     pages: 2
-  - type: laporan
+  - type: report
     pages: 3
-  - type: surat-jalan
+  - type: delivery-note
     pages: 2
 `)
 	jobs, err := LoadBatch(path, Config{Type: TypeInvoice, Seed: 42})
@@ -175,7 +175,7 @@ func TestDefaultOutputName(t *testing.T) {
 
 	other, err := DefaultOutputName(TypeInvoice, at)
 	require.NoError(t, err)
-	assert.NotEqual(t, name, other, "uuid v7 harus unik")
+	assert.NotEqual(t, name, other, "uuid v7 must be unique")
 }
 
 func TestLoadBatchInheritsProvidedTitle(t *testing.T) {

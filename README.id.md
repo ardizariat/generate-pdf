@@ -2,8 +2,12 @@
 
 [English README](README.md)
 
-`pdfgen` membuat file PDF **contoh (dummy)** untuk enam jenis dokumen kantor:
-invoice, surat resmi, laporan, kuitansi, surat jalan, dan sertifikat.
+`pdfgen` adalah CLI dan library Go kecil untuk membuat file PDF **contoh (dummy)**
+dalam enam jenis dokumen kantor: invoice, surat resmi, laporan, kuitansi, surat jalan,
+dan sertifikat.
+
+Keluaran default berbahasa Inggris; pakai `--lang id` untuk bahasa Indonesia. Slug
+jenis dokumen dan nama file tetap bahasa Inggris di kedua bahasa.
 
 Semua isinya data karangan, bukan data asli, jadi aman dipakai untuk demo, latihan,
 tampilan ke klien, atau menguji aplikasi lain yang membutuhkan contoh PDF. File bisa
@@ -14,10 +18,13 @@ pengujian. Nama file tetap berbeda tiap kali generate supaya tidak saling menimp
 
 ## Status
 
-Tahap awal (`v0.1.x`). CLI dan format manifest dapat berubah pada rilis minor; pin
+Tahap awal (`v0.2.x`). CLI dan format manifest dapat berubah pada rilis minor; pin
 versi rilis bila membutuhkan antarmuka yang stabil. Project dikelola oleh satu orang
-dengan dukungan best-effort, dan hanya rilis terbaru yang menerima perbaikan. Pesan
-CLI memakai bahasa Indonesia; dokumentasi tersedia dalam bahasa Inggris dan Indonesia.
+dengan dukungan best-effort, dan hanya rilis terbaru yang menerima perbaikan.
+
+Pesan CLI, error, dan deskripsi flag memakai bahasa Inggris. Keluaran saat berjalan
+dan isi PDF mengikuti `--lang`; dokumentasi tersedia dalam bahasa Inggris dan
+Indonesia.
 
 ## Versi dan kompatibilitas
 
@@ -86,10 +93,10 @@ langsung berjalan dan ringkasan dicetak ke stdout.
 
 ```bash
 pdfgen --no-input                                  # invoice default
-pdfgen -t laporan -s 7 --no-input --verify
-pdfgen -t sertifikat --title "Sertifikat Pelatihan" --no-input
-pdfgen -t kuitansi --out output/kuitansi.pdf
-pdfgen -t laporan --out-dir hasil --no-input       # tulis ke hasil/
+pdfgen -t report --lang id -s 7 --no-input --verify
+pdfgen -t certificate --lang id --title "Sertifikat Pelatihan" --no-input
+pdfgen -t receipt --out output/receipt.pdf
+pdfgen -t report --lang id --out-dir hasil --no-input   # tulis ke hasil/
 ```
 
 Pada mode ini `--rows` mengatur jumlah baris tabel; tidak ada opsi jumlah halaman pasti.
@@ -113,25 +120,69 @@ noninteraktif. Nama file default selalu
 `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf`, dan folder output dibuat otomatis.
 Menimpa file yang sudah ada hanya dengan `--force`.
 
+## Library
+
+Modul root menyediakan API Go tipis di atas renderer yang sama:
+
+```go
+import "github.com/ardizariat/generate-pdf"
+
+res, err := pdfgen.Generate("out/report.pdf", pdfgen.Options{
+	Type:     "report",
+	Language: "id",       // "" = en
+	Rows:     40,         // -1 = default per jenis
+	Seed:     7,
+})
+if err != nil {
+	return err
+}
+fmt.Println(res.Pages, res.Bytes)
+```
+
+`Render(w io.Writer, opts Options)` menulis ke writer apa pun, bukan ke file. Default
+`Options`: `Type` kosong berarti `invoice`, `Language` kosong berarti `en`, `Title`
+kosong berarti judul jenis sesuai bahasa, dan `Rows: -1` memakai default per jenis.
+`Seed: 0` tetap deterministik (berbeda dari CLI, yang mengartikan `0` sebagai acak).
+`Generate` menolak menimpa file yang sudah ada kecuali `Force` diisi. Error dapat
+dicocokkan dengan `errors.Is(err, pdfgen.ErrInvalidOptions)`,
+`ErrUnsupportedType`, atau `ErrOutputExists`.
+
+Package internal tetap `internal/`; permukaan publik hanya `Options`, `Result`,
+`Render`, `Generate`, dan sentinel error. Belum ada API context atau batch.
+
 ## Jenis dokumen
 
 | `--type` | Default `--rows` | Default `--title` | Isi |
 |---|---|---|---|
 | `invoice` | 8 | Invoice | Kop, penjual/pembeli, tabel barang, subtotal/PPN 11%/total, tanda tangan |
-| `surat-resmi` | 0 (tanpa tabel) | Surat Resmi | Kop, nomor, perihal, tujuan, tiga paragraf, tanda tangan |
-| `laporan` | 70 | Laporan | Dua paragraf dan tabel yang mengalir multi-halaman |
-| `kuitansi` | 0 (tanpa tabel) | Kuitansi | Kotak berbingkai, nominal angka dan terbilang, tanda tangan |
-| `surat-jalan` | 25 | Surat Jalan | Tujuan, tabel barang, tanda tangan pengirim dan penerima |
-| `sertifikat` | 0 (tanpa tabel) | Sertifikat | Landscape, nama besar, paragraf penghargaan, QR verifikasi |
+| `letter` | 0 (tanpa tabel) | Letter / Surat Resmi | Kop, nomor, perihal, tujuan, tiga paragraf, tanda tangan |
+| `report` | 70 | Report / Laporan | Dua paragraf dan tabel yang mengalir multi-halaman |
+| `receipt` | 0 (tanpa tabel) | Receipt / Kuitansi | Kotak berbingkai, nominal angka dan terbilang, tanda tangan |
+| `delivery-note` | 25 | Delivery Note / Surat Jalan | Tujuan, tabel barang, tanda tangan pengirim dan penerima |
+| `certificate` | 0 (tanpa tabel) | Certificate / Sertifikat | Landscape, nama besar, paragraf penghargaan, QR verifikasi |
 
-`--rows` hanya berpengaruh pada `invoice`, `laporan`, dan `surat-jalan`; untuk jenis
+`--rows` hanya berpengaruh pada `invoice`, `report`, dan `delivery-note`; untuk jenis
 lain nilainya diabaikan.
+
+## Bahasa
+
+`--lang` (atau `GENPDF_LANG`, atau key `lang` di file konfigurasi) memilih bahasa:
+
+| Nilai | Data | Uang | Tanggal | Nominal dalam kata |
+|---|---|---|---|---|
+| `en` (default) | Nama dan alamat internasional ASCII | `$1,234.56` | `02 January 2006` | `one thousand two hundred thirty-four dollars` |
+| `id` | Nama dan alamat Indonesia | `Rp1.234.567` | `02 Januari 2006` | `satu juta dua ratus tiga puluh empat ribu rupiah` |
+
+Bahasa tidak pernah dideteksi dari `LANG`; default selalu `en`. Nilai yang tidak
+dikenal dianggap error konfigurasi. Slug jenis dokumen, nama file, teks bantuan, dan
+error tetap bahasa Inggris.
 
 ## Batasan yang diketahui
 
-- Data, mata uang, dan konvensi dokumen hanya untuk Indonesia.
-- `surat-resmi`, `kuitansi`, dan `sertifikat` selalu 1 halaman. Target halaman pasti
-  hanya tersedia untuk dokumen bertabel, dan hanya di mode batch.
+- Hanya tersedia dua bahasa: Inggris dan Indonesia. Tidak ada deteksi otomatis atau
+  terjemahan kustom.
+- `letter`, `receipt`, dan `certificate` selalu 1 halaman. Target halaman pasti hanya
+  tersedia untuk dokumen bertabel, dan hanya di mode batch.
 - Layout bersifat tetap. Tidak ada template, logo, font kustom, enkripsi PDF, atau
   tanda tangan digital.
 - Pencarian target halaman dibatasi 2000 baris tabel; target yang lebih besar akan
@@ -147,7 +198,8 @@ lain nilainya diabaikan.
 
 | Flag | Default | Keterangan |
 |---|---|---|
-| `-t, --type` | `invoice` | Jenis dokumen: `invoice`, `surat-resmi`, `laporan`, `kuitansi`, `surat-jalan`, `sertifikat` |
+| `-t, --type` | `invoice` | Jenis dokumen: `invoice`, `letter`, `report`, `receipt`, `delivery-note`, `certificate` |
+| `--lang` | `en` | Bahasa keluaran: `en` atau `id` |
 | `-o, --out` | `<out-dir>/<type>_<UTC>_<uuid v7>.pdf` | Path output PDF (persis) |
 | `--out-dir` | `output` | Folder dasar output default dan path relatif; dibuat otomatis |
 | `-r, --rows` | `-1` (efektif per jenis) | Jumlah baris tabel mode satu dokumen; diabaikan bila jenis tidak bertabel |
@@ -184,7 +236,8 @@ menulis file konfigurasi. Nama key sama dengan nama flag:
 
 ```yaml
 # generate-pdf.yaml
-type: laporan
+type: report
+lang: id
 rows: 20
 seed: 7
 out-dir: hasil
@@ -192,12 +245,13 @@ verify: true
 ```
 
 Environment variable memakai prefix `GENPDF_` dengan `-` diganti `_`:
-`GENPDF_TYPE`, `GENPDF_OUT`, `GENPDF_OUT_DIR`, `GENPDF_ROWS`, `GENPDF_SEED`,
+`GENPDF_TYPE`, `GENPDF_LANG`, `GENPDF_OUT`, `GENPDF_OUT_DIR`, `GENPDF_ROWS`, `GENPDF_SEED`,
 `GENPDF_TITLE`, `GENPDF_BATCH`, `GENPDF_NO_INPUT`, `GENPDF_FORCE`, `GENPDF_VERIFY`,
 `GENPDF_VERBOSE`, `GENPDF_CONFIG`.
 
 Config divalidasi setelah semua sumber digabung dan sekali lagi setelah prompt:
-`type` wajib salah satu jenis di atas dan `rows` minimal `0`. Bila `--out` tidak
+`type` wajib salah satu jenis di atas, `lang` harus `en` atau `id`, dan `rows`
+minimal `0`. Bila `--out` tidak
 diberikan, path dihitung dari `--out-dir` dan nama file otomatis.
 
 ## Mode interaktif dan noninteraktif
@@ -210,7 +264,7 @@ diberikan, path dihitung dari `--out-dir` dan nama file otomatis.
     semua file memakai jenis itu.
   - `--rows` dan `--out` tidak dipakai di mode ini; lokasi diatur `--out-dir` dan nama
     file selalu otomatis.
-  - Jumlah halaman > 1 hanya berlaku untuk `invoice`, `laporan`, dan `surat-jalan`;
+  - Jumlah halaman > 1 hanya berlaku untuk `invoice`, `report`, dan `delivery-note`;
     jenis tanpa tabel selalu 1 halaman.
   - Path output, seed, dan judul tidak ditanyakan: output otomatis
     `<out-dir>/<type>_<UTC>_<uuid v7>.pdf`, seed dari flag/env/default, judul default
@@ -240,10 +294,10 @@ jobs:
     pages: 2            # PDF ini harus tepat 2 halaman
     seed: 7             # penentu isi; seed sama = isi sama
     out: invoice-a.pdf  # nama file; relatif -> <out-dir>/invoice-a.pdf
-  - type: laporan
+  - type: report
     pages: 3
     seed: 8             # out tidak ditulis -> nama unik otomatis
-  - type: surat-jalan   # jenis tanpa tabel, wajib 1 halaman
+  - type: delivery-note # jenis tanpa tabel, wajib 1 halaman
 ```
 
 Jalankan dengan:
@@ -267,8 +321,8 @@ pdfgen --batch jobs.yaml --no-input
 - **`pages` harus tepat.** Untuk dokumen bertabel, program mengisi baris tabel
   sebanyak mungkin sampai pas dengan jumlah halaman itu, lalu menghitung halaman
   dengan `pdfcpu`. Kalau target tidak bisa dicapai, file itu gagal dibuat.
-- **Halaman lebih dari 1 hanya untuk dokumen bertabel**: `invoice`, `laporan`, dan
-  `surat-jalan`. `surat-resmi`, `kuitansi`, dan `sertifikat` selalu 1 halaman.
+- **Halaman lebih dari 1 hanya untuk dokumen bertabel**: `invoice`, `report`, dan
+  `delivery-note`. `letter`, `receipt`, dan `certificate` selalu 1 halaman.
 - **`--rows` tidak dipakai di mode batch.** Jumlah isi tabel diatur oleh `pages`.
 - **Semua entri diperiksa dulu sebelum menulis file.** Satu entri salah membuat seluruh
   batch berhenti tanpa menghasilkan file apa pun.
@@ -291,8 +345,8 @@ target 2 halaman`, atau satu baris teks bila bukan terminal). Setelah selesai, s
 berisi ringkasan per file, misalnya:
 
 ```
-ok     output/laporan_20261021T141530Z_0192f3a4-....pdf  3 halaman  178697 bytes
-ringkasan: 3 sukses, 0 gagal
+ok     output/report_20261021T141530Z_0192f3a4-....pdf  3 pages  178697 bytes
+summary: 3 succeeded, 0 failed
 ```
 
 ## Perilaku output
@@ -333,11 +387,11 @@ Contoh PDF dengan seed tetap:
 | Dokumen | File |
 |---|---|
 | Invoice | [examples/invoice.pdf](examples/invoice.pdf) |
-| Surat resmi | [examples/surat-resmi.pdf](examples/surat-resmi.pdf) |
-| Laporan | [examples/laporan.pdf](examples/laporan.pdf) |
-| Kuitansi | [examples/kuitansi.pdf](examples/kuitansi.pdf) |
-| Surat jalan | [examples/surat-jalan.pdf](examples/surat-jalan.pdf) |
-| Sertifikat | [examples/sertifikat.pdf](examples/sertifikat.pdf) |
+| Surat resmi | [examples/letter.pdf](examples/letter.pdf) |
+| Laporan | [examples/report.pdf](examples/report.pdf) |
+| Kuitansi | [examples/receipt.pdf](examples/receipt.pdf) |
+| Surat jalan | [examples/delivery-note.pdf](examples/delivery-note.pdf) |
+| Sertifikat | [examples/certificate.pdf](examples/certificate.pdf) |
 
 ## Dependensi
 

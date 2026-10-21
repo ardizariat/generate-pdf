@@ -12,12 +12,10 @@ import (
 	"github.com/johnfercher/maroto/v2/pkg/props"
 
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
-var (
-	reportTitles = []string{"No", "Nama", "Kota", "Email", "Nilai", "Tanggal"}
-	reportWidths = []int{1, 3, 2, 3, 2, 2}
-)
+var reportWidths = []int{1, 3, 2, 3, 2, 2}
 
 // reportGridSize gives the report table 13 grid units, matching its column widths.
 const reportGridSize = 13
@@ -25,7 +23,8 @@ const reportGridSize = 13
 // AddReportDocument renders the report layout using only the data payload.
 // Table rows flow onto new pages by themselves; no manual AddPage is used.
 func AddReportDocument(m core.Maroto, r data.Report) error {
-	addReportHeading(m, r)
+	labels := locale.Get(r.Language)
+	addReportHeading(m, r, labels)
 
 	rows := make([][]string, 0, len(r.ReportRows))
 	for _, record := range r.ReportRows {
@@ -34,23 +33,24 @@ func AddReportDocument(m core.Maroto, r data.Report) error {
 			record.Name,
 			record.City,
 			record.Email,
-			formatRupiah(record.Value),
-			record.Date.Format("02 Jan 2006"),
+			locale.FormatMoney(r.Language, record.Value),
+			locale.FormatDate(r.Language, record.Date),
 		})
 	}
-	if err := addTable(m, reportTitles, reportWidths, rows); err != nil {
+	titles := []string{labels.No, labels.Name, labels.City, labels.Email, labels.Value, labels.Date}
+	if err := addTable(m, titles, reportWidths, rows); err != nil {
 		return fmt.Errorf("report table: %w", err)
 	}
 	return nil
 }
 
 // addReportHeading adds the title, date, and two summary paragraphs.
-func addReportHeading(m core.Maroto, r data.Report) {
+func addReportHeading(m core.Maroto, r data.Report, labels locale.Labels) {
 	m.AddRows(row.New(9).Add(
 		col.New().Add(text.New(r.Title, props.Text{Style: fontstyle.Bold, Size: 14})),
 	))
 	m.AddRows(row.New(5).Add(
-		col.New().Add(text.New("Tanggal: "+r.Date.Format("02 Jan 2006"), props.Text{Size: 9})),
+		col.New().Add(text.New(labels.Date+": "+locale.FormatDate(r.Language, r.Date), props.Text{Size: 9})),
 	))
 	m.AddRows(row.New(4))
 

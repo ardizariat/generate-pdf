@@ -11,18 +11,19 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 func TestCoreUnknownType(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "unknown.pdf")
 
-	r, err := data.Generate("invoice", 8, 42)
+	r, err := data.Generate("invoice", 8, 42, locale.English)
 	require.NoError(t, err)
 	r.Type = "tidak-ada"
 
 	pages, size, err := Generate(r, out, true)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `jenis dokumen tidak didukung: "tidak-ada"`)
+	assert.Contains(t, err.Error(), `unsupported document type: "tidak-ada"`)
 	assert.Zero(t, pages)
 	assert.Zero(t, size)
 
@@ -36,14 +37,14 @@ func TestCoreDeterministic(t *testing.T) {
 	first := filepath.Join(dir, "first.pdf")
 	second := filepath.Join(dir, "second.pdf")
 
-	r1, err := data.Generate("invoice", 8, 42)
+	r1, err := data.Generate("invoice", 8, 42, locale.English)
 	require.NoError(t, err)
 	pages, size, err := Generate(r1, first, true)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, pages, 1)
 	assert.Positive(t, size)
 
-	r2, err := data.Generate("invoice", 8, 42)
+	r2, err := data.Generate("invoice", 8, 42, locale.English)
 	require.NoError(t, err)
 	_, _, err = Generate(r2, second, true)
 	require.NoError(t, err)
@@ -58,7 +59,7 @@ func TestCoreDeterministic(t *testing.T) {
 func TestCoreVerifyRejectsTruncated(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "truncated.pdf")
 
-	r, err := data.Generate("kuitansi", 0, 42)
+	r, err := data.Generate("receipt", 0, 42, locale.English)
 	require.NoError(t, err)
 	_, _, err = Generate(r, path, true)
 	require.NoError(t, err)
@@ -81,7 +82,7 @@ func TestCoreVerifyFailureIsNotSilent(t *testing.T) {
 	}
 	t.Cleanup(func() { verifyPDF = original })
 
-	r, err := data.Generate("invoice", 8, 42)
+	r, err := data.Generate("invoice", 8, 42, locale.English)
 	require.NoError(t, err)
 
 	dir := t.TempDir()
@@ -89,7 +90,7 @@ func TestCoreVerifyFailureIsNotSilent(t *testing.T) {
 	pages, _, err := Generate(r, out, true)
 	require.Error(t, err)
 	assert.Zero(t, pages)
-	assert.Contains(t, err.Error(), "verifikasi")
+	assert.Contains(t, err.Error(), "verify")
 
 	_, statErr := os.Stat(out)
 	assert.True(t, errors.Is(statErr, os.ErrNotExist), "file gagal tidak boleh tercipta: %v", statErr)
@@ -105,7 +106,7 @@ func TestCoreVerifyFailureKeepsExistingFile(t *testing.T) {
 	}
 	t.Cleanup(func() { verifyPDF = original })
 
-	r, err := data.Generate("invoice", 8, 42)
+	r, err := data.Generate("invoice", 8, 42, locale.English)
 	require.NoError(t, err)
 
 	dir := t.TempDir()
@@ -130,7 +131,7 @@ func TestCoreGeneratePagesFailureLeavesNoFile(t *testing.T) {
 	dir := t.TempDir()
 	out := filepath.Join(dir, "two.pdf")
 	build := func(int) (data.Report, error) {
-		return data.Generate("kuitansi", 0, 42)
+		return data.Generate("receipt", 0, 42, locale.English)
 	}
 
 	_, _, _, err := GeneratePages(build, out, 2, true)

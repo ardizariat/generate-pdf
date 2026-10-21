@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 // Job is one batch entry after inheriting the global configuration.
@@ -39,7 +41,7 @@ type jobEntry struct {
 func LoadBatch(path string, base Config) ([]Job, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("baca manifest %s: %w", path, err)
+		return nil, fmt.Errorf("read manifest %s: %w", path, err)
 	}
 
 	var m manifest
@@ -49,7 +51,7 @@ func LoadBatch(path string, base Config) ([]Job, error) {
 		return nil, fmt.Errorf("parse manifest %s: %w", path, err)
 	}
 	if len(m.Jobs) == 0 {
-		return nil, fmt.Errorf("manifest %s: jobs kosong", path)
+		return nil, fmt.Errorf("manifest %s: jobs is empty", path)
 	}
 
 	jobs := make([]Job, 0, len(m.Jobs))
@@ -74,7 +76,7 @@ func LoadBatch(path string, base Config) ([]Job, error) {
 			if base.Provided("title") {
 				job.Title = base.Title
 			} else {
-				job.Title = typeDefaults[job.Type].title
+				job.Title = locale.Get(locale.OrDefault(base.Language)).TypeTitles[job.Type]
 			}
 		}
 		job.Out = OutputPath(base.OutDir, job.Out)
@@ -97,25 +99,25 @@ func LoadBatch(path string, base Config) ([]Job, error) {
 // ValidateJobs rejects an empty batch and any job that cannot be generated.
 func ValidateJobs(jobs []Job) error {
 	if len(jobs) == 0 {
-		return fmt.Errorf("batch: minimal satu job")
+		return fmt.Errorf("batch: at least one job is required")
 	}
 
 	messages := make([]string, 0, len(jobs))
 	for i, job := range jobs {
-		if err := Validate(Config{Type: job.Type, Out: job.Out}); err != nil {
+		if err := Validate(Config{Type: job.Type, Language: string(locale.English), Out: job.Out}); err != nil {
 			messages = append(messages, fmt.Sprintf("job %d: %v", i+1, err))
 		}
 		if job.Pages < 1 {
 			messages = append(messages, fmt.Sprintf("job %d: Pages=%d (gte 1)", i+1, job.Pages))
 		}
 		if job.Pages > 1 && !SupportsMultiPage(job.Type) {
-			messages = append(messages, fmt.Sprintf("job %d: Pages=%d tidak didukung untuk jenis %s (maksimal 1)", i+1, job.Pages, job.Type))
+			messages = append(messages, fmt.Sprintf("job %d: Pages=%d is not supported for type %s (max 1)", i+1, job.Pages, job.Type))
 		}
 	}
 	if len(messages) == 0 {
 		return nil
 	}
-	return fmt.Errorf("batch tidak valid: %s", strings.Join(messages, "; "))
+	return fmt.Errorf("invalid batch: %s", strings.Join(messages, "; "))
 }
 
 // SupportsMultiPage reports whether a document type may exceed one page.

@@ -15,36 +15,38 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 var invoiceWidths = []int{5, 1, 3, 3}
 
 // AddInvoice renders the invoice layout using only the data payload.
 func AddInvoice(m core.Maroto, r data.Report) error {
-	addInvoiceHeader(m, r)
+	labels := locale.Get(r.Language)
+	addInvoiceHeader(m, r, labels)
 
-	if err := addTableHeader(m, []string{"Barang", "Qty", "Harga", "Subtotal"}, invoiceWidths); err != nil {
+	if err := addTableHeader(m, []string{labels.Item, labels.Qty, labels.Price, labels.Subtotal}, invoiceWidths); err != nil {
 		return fmt.Errorf("invoice table header: %w", err)
 	}
 	for _, item := range r.InvoiceItems {
 		cells := []string{
 			item.Name,
 			strconv.Itoa(item.Qty),
-			formatRupiah(item.Price),
-			formatRupiah(item.Subtotal),
+			locale.FormatMoney(r.Language, item.Price),
+			locale.FormatMoney(r.Language, item.Subtotal),
 		}
 		if err := addTableRow(m, cells, invoiceWidths); err != nil {
 			return fmt.Errorf("invoice table row: %w", err)
 		}
 	}
 
-	addInvoiceTotals(m, r.InvoiceTotals)
+	addInvoiceTotals(m, r, labels)
 	addInvoiceSignature(m, r.From)
 	return nil
 }
 
 // addInvoiceHeader adds the seller letterhead, document meta, and both parties.
-func addInvoiceHeader(m core.Maroto, r data.Report) {
+func addInvoiceHeader(m core.Maroto, r data.Report, labels locale.Labels) {
 	m.AddRows(row.New(8).Add(
 		col.New(gridSize).Add(text.New(r.From.Company, props.Text{Style: fontstyle.Bold, Size: 12})),
 	))
@@ -54,14 +56,14 @@ func addInvoiceHeader(m core.Maroto, r data.Report) {
 	m.AddRows(row.New(4))
 
 	m.AddRows(row.New(5).Add(
-		col.New(6).Add(text.New("No. Invoice: "+r.DocID, props.Text{Size: 8})),
-		col.New(6).Add(text.New("Tanggal: "+r.Date.Format("02 Jan 2006"), props.Text{Size: 8, Align: align.Right})),
+		col.New(6).Add(text.New(labels.InvoiceNo+": "+r.DocID, props.Text{Size: 8})),
+		col.New(6).Add(text.New(labels.Date+": "+locale.FormatDate(r.Language, r.Date), props.Text{Size: 8, Align: align.Right})),
 	))
 	m.AddRows(row.New(4))
 
 	m.AddRows(row.New(5).Add(
-		col.New(6).Add(text.New("Penjual", props.Text{Style: fontstyle.Bold, Size: 8})),
-		col.New(6).Add(text.New("Pembeli", props.Text{Style: fontstyle.Bold, Size: 8})),
+		col.New(6).Add(text.New(labels.Seller, props.Text{Style: fontstyle.Bold, Size: 8})),
+		col.New(6).Add(text.New(labels.Buyer, props.Text{Style: fontstyle.Bold, Size: 8})),
 	))
 	addInvoicePartyRow(m, r.From.Company, r.To.Company)
 	addInvoicePartyRow(m, r.From.Address, r.To.Address)
@@ -77,14 +79,14 @@ func addInvoicePartyRow(m core.Maroto, left, right string) {
 }
 
 // addInvoiceTotals adds the right-aligned amount summary.
-func addInvoiceTotals(m core.Maroto, totals data.InvoiceTotals) {
-	addInvoiceTotalRow(m, "Subtotal", totals.Subtotal, false)
-	addInvoiceTotalRow(m, "PPN 11%", totals.Tax, false)
-	addInvoiceTotalRow(m, "Total", totals.Total, true)
+func addInvoiceTotals(m core.Maroto, r data.Report, labels locale.Labels) {
+	addInvoiceTotalRow(m, r.Language, labels.Subtotal, r.InvoiceTotals.Subtotal, false)
+	addInvoiceTotalRow(m, r.Language, labels.Tax, r.InvoiceTotals.Tax, false)
+	addInvoiceTotalRow(m, r.Language, labels.Total, r.InvoiceTotals.Total, true)
 	m.AddRows(row.New(4))
 }
 
-func addInvoiceTotalRow(m core.Maroto, label string, value decimal.Decimal, bold bool) {
+func addInvoiceTotalRow(m core.Maroto, lang locale.Language, label string, value decimal.Decimal, bold bool) {
 	style := fontstyle.Normal
 	if bold {
 		style = fontstyle.Bold
@@ -93,7 +95,7 @@ func addInvoiceTotalRow(m core.Maroto, label string, value decimal.Decimal, bold
 	m.AddRows(row.New(6).Add(
 		col.New(6),
 		col.New(3).Add(text.New(label, props.Text{Size: 9, Style: style, Align: align.Right})),
-		col.New(3).Add(text.New(formatRupiah(value), props.Text{Size: 9, Style: style, Align: align.Right})),
+		col.New(3).Add(text.New(locale.FormatMoney(lang, value), props.Text{Size: 9, Style: style, Align: align.Right})),
 	))
 }
 

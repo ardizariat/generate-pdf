@@ -23,19 +23,19 @@ func writeBatch(t *testing.T, content string) string {
 func TestBatchGeneratesEveryJob(t *testing.T) {
 	dir := t.TempDir()
 	invoice := filepath.Join(dir, "invoice.pdf")
-	laporan := filepath.Join(dir, "laporan.pdf")
-	delivery := filepath.Join(dir, "surat-jalan.pdf")
+	laporan := filepath.Join(dir, "report.pdf")
+	delivery := filepath.Join(dir, "delivery-note.pdf")
 
 	batch := writeBatch(t, fmt.Sprintf(`jobs:
   - type: invoice
     pages: 1
     seed: 1
     out: %s
-  - type: laporan
+  - type: report
     pages: 2
     seed: 2
     out: %s
-  - type: surat-jalan
+  - type: delivery-note
     pages: 3
     seed: 3
     out: %s
@@ -43,7 +43,7 @@ func TestBatchGeneratesEveryJob(t *testing.T) {
 
 	out, err := execute(t, "--batch", batch, "--no-input", "--verify")
 	require.NoError(t, err)
-	assert.Contains(t, out, "ringkasan: 3 sukses, 0 gagal")
+	assert.Contains(t, out, "summary: 3 succeeded, 0 failed")
 
 	for path, wantPages := range map[string]int{invoice: 1, laporan: 2, delivery: 3} {
 		info, err := os.Stat(path)
@@ -59,22 +59,22 @@ func TestBatchGeneratesEveryJob(t *testing.T) {
 func TestBatchContinuesAfterFailure(t *testing.T) {
 	dir := t.TempDir()
 	existing := filepath.Join(dir, "existing.pdf")
-	laporan := filepath.Join(dir, "laporan.pdf")
+	laporan := filepath.Join(dir, "report.pdf")
 	require.NoError(t, os.WriteFile(existing, []byte("%PDF-lama"), 0o644))
 
 	batch := writeBatch(t, fmt.Sprintf(`jobs:
   - type: invoice
     out: %s
-  - type: laporan
+  - type: report
     pages: 1
     out: %s
 `, existing, laporan))
 
 	out, err := execute(t, "--batch", batch, "--no-input")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "1 dari 2 file gagal")
-	assert.Contains(t, out, "gagal  "+existing)
-	assert.Contains(t, out, "ringkasan: 1 sukses, 1 gagal")
+	assert.Contains(t, err.Error(), "1 of 2 files failed")
+	assert.Contains(t, out, "failed  "+existing)
+	assert.Contains(t, out, "summary: 1 succeeded, 1 failed")
 
 	unchanged, err := os.ReadFile(existing)
 	require.NoError(t, err)
@@ -106,11 +106,11 @@ func TestBatchInvalidManifestWritesNothing(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "surat.pdf")
 
-	batch := writeBatch(t, fmt.Sprintf("jobs:\n  - type: surat-resmi\n    pages: 2\n    out: %s\n", path))
+	batch := writeBatch(t, fmt.Sprintf("jobs:\n  - type: letter\n    pages: 2\n    out: %s\n", path))
 
 	_, err := execute(t, "--batch", batch, "--no-input")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "surat-resmi")
+	assert.Contains(t, err.Error(), "letter")
 
 	_, statErr := os.Stat(path)
 	assert.ErrorIs(t, statErr, os.ErrNotExist)

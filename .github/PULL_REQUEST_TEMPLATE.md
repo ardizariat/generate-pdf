@@ -12,6 +12,13 @@
 - [ ] `make test`
 - [ ] `make race`
 - [ ] `make lint`
+- [ ] `make vuln`
+
+## User-facing changes
+
+- [ ] Flag/help/error text stays English
+- [ ] New runtime or PDF text exists in both `en` and `id`
+- [ ] READMEs updated if behavior changed
 
 ## Notes
 

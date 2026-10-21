@@ -25,7 +25,7 @@ var verifyPDF = Verify
 func Generate(r data.Report, out string, verify bool) (pages int, size int64, err error) {
 	staged, err := stagePath(out)
 	if err != nil {
-		return 0, 0, fmt.Errorf("buat file sementara untuk %s: %w", out, err)
+		return 0, 0, fmt.Errorf("create temporary file for %s: %w", out, err)
 	}
 	defer func() { _ = os.Remove(staged) }()
 
@@ -34,7 +34,7 @@ func Generate(r data.Report, out string, verify bool) (pages int, size int64, er
 		return 0, 0, err
 	}
 	if err := commit(staged, out); err != nil {
-		return 0, 0, fmt.Errorf("simpan %s: %w", out, err)
+		return 0, 0, fmt.Errorf("save %s: %w", out, err)
 	}
 	return pages, size, nil
 }
@@ -50,7 +50,7 @@ func generate(r data.Report, path, display string, verify bool) (pages int, size
 
 	m, err := newDocument(r)
 	if err != nil {
-		return 0, 0, fmt.Errorf("buat dokumen: %w", err)
+		return 0, 0, fmt.Errorf("build document: %w", err)
 	}
 	if err := addContent(m, r); err != nil {
 		return 0, 0, err
@@ -61,7 +61,7 @@ func generate(r data.Report, path, display string, verify bool) (pages int, size
 		return 0, 0, fmt.Errorf("render %s: %w", r.Type, err)
 	}
 	if err := doc.Save(path); err != nil {
-		return 0, 0, fmt.Errorf("simpan %s: %w", display, err)
+		return 0, 0, fmt.Errorf("save %s: %w", display, err)
 	}
 
 	info, err := os.Stat(path)
@@ -72,7 +72,7 @@ func generate(r data.Report, path, display string, verify bool) (pages int, size
 
 	pages, err = verifyPDF(path)
 	if err != nil && verify {
-		return 0, size, fmt.Errorf("verifikasi %s: %w", display, err)
+		return 0, size, fmt.Errorf("verify %s: %w", display, err)
 	}
 	return pages, size, nil
 }
@@ -111,18 +111,18 @@ func addContent(m core.Maroto, r data.Report) error {
 	switch r.Type {
 	case "invoice":
 		return AddInvoice(m, r)
-	case "surat-resmi":
+	case "letter":
 		return AddLetter(m, r)
-	case "laporan":
+	case "report":
 		return AddReportDocument(m, r)
-	case "kuitansi":
+	case "receipt":
 		return AddReceipt(m, r)
-	case "surat-jalan":
+	case "delivery-note":
 		return AddDelivery(m, r)
-	case "sertifikat":
+	case "certificate":
 		return AddCertificate(m, r)
 	default:
-		return fmt.Errorf("jenis dokumen tidak didukung: %q", r.Type)
+		return fmt.Errorf("unsupported document type: %q", r.Type)
 	}
 }
 
@@ -130,21 +130,21 @@ func addContent(m core.Maroto, r data.Report) error {
 func Verify(path string) (pages int, err error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return 0, fmt.Errorf("baca %s: %w", path, err)
+		return 0, fmt.Errorf("read %s: %w", path, err)
 	}
 
 	// pdfcpu repairs a truncated tail, so the EOF marker is checked here.
 	if !bytes.HasSuffix(bytes.TrimSpace(content), []byte("%%EOF")) {
-		return 0, fmt.Errorf("validasi %s: penanda %%EOF tidak ditemukan", path)
+		return 0, fmt.Errorf("validate %s: %%EOF marker not found", path)
 	}
 
 	if err := api.Validate(bytes.NewReader(content), model.NewDefaultConfiguration()); err != nil {
-		return 0, fmt.Errorf("validasi %s: %w", path, err)
+		return 0, fmt.Errorf("validate %s: %w", path, err)
 	}
 
 	pages, err = api.PageCountFile(path)
 	if err != nil {
-		return 0, fmt.Errorf("hitung halaman %s: %w", path, err)
+		return 0, fmt.Errorf("count pages in %s: %w", path, err)
 	}
 	return pages, nil
 }

@@ -2,7 +2,6 @@ package report
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/johnfercher/maroto/v2"
 	"github.com/johnfercher/maroto/v2/pkg/components/code"
@@ -20,9 +19,9 @@ import (
 	"github.com/johnfercher/maroto/v2/pkg/consts/pagesize"
 	"github.com/johnfercher/maroto/v2/pkg/core"
 	"github.com/johnfercher/maroto/v2/pkg/props"
-	"github.com/shopspring/decimal"
 
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 const (
@@ -45,7 +44,7 @@ var tableHeaderColor = props.Color{Red: 240, Green: 240, Blue: 240}
 // It is the only place document configuration is created.
 func newDocument(r data.Report) (core.Maroto, error) {
 	pageOrientation := orientation.Vertical
-	if r.Type == "sertifikat" {
+	if r.Type == "certificate" {
 		pageOrientation = orientation.Horizontal
 	}
 
@@ -63,13 +62,13 @@ func newDocument(r data.Report) (core.Maroto, error) {
 		WithSubject(r.Type, true)
 
 	// The report table needs one extra grid unit to keep its column proportions.
-	if r.Type == "laporan" {
+	if r.Type == "report" {
 		builder = builder.WithMaxGridSize(reportGridSize)
 	}
 
 	cfg := builder.
 		WithPageNumber(props.PageNumber{
-			Pattern: "Halaman {current} dari {total}",
+			Pattern: locale.Get(r.Language).PagePattern,
 			Place:   props.Bottom,
 			Size:    pageNumberFontSize,
 		}).
@@ -205,30 +204,6 @@ func fillCurrentPage(m core.Maroto) {
 // addParagraph adds a wrapped paragraph.
 func addParagraph(m core.Maroto, value string) {
 	m.AddRows(text.NewAutoRow(value, props.Text{Size: 9}))
-}
-
-// formatRupiah renders a decimal as Indonesian rupiah, for example Rp1.234.567,50.
-func formatRupiah(value decimal.Decimal) string {
-	negative := value.IsNegative()
-	parts := strings.SplitN(value.Abs().StringFixed(2), ".", 2)
-	whole := parts[0]
-
-	var grouped strings.Builder
-	for i, digit := range whole {
-		if i > 0 && (len(whole)-i)%3 == 0 {
-			grouped.WriteByte('.')
-		}
-		grouped.WriteRune(digit)
-	}
-
-	result := "Rp" + grouped.String()
-	if parts[1] != "00" {
-		result += "," + parts[1]
-	}
-	if negative {
-		result = "-" + result
-	}
-	return result
 }
 
 // validateTable checks that each cell has a width and that the widths fill the

@@ -5,9 +5,9 @@ updates:
     schedule:
       interval: weekly
     ignore:
-      # maroto v2.4.3 still uses the pdfcpu 0.11 API; revisit when it supports 0.16
+      # maroto v2.4.3 does not build with pdfcpu 0.16; revisit when maroto supports it
       - dependency-name: "github.com/pdfcpu/pdfcpu"
-        versions: [">= 0.12.0"]
+        versions: [">= 0.16.0"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
