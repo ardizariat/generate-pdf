@@ -27,21 +27,19 @@ const reportGridSize = 13
 func AddReportDocument(m core.Maroto, r data.Report) error {
 	addReportHeading(m, r)
 
-	if err := addTableHeader(m, reportTitles, reportWidths); err != nil {
-		return fmt.Errorf("report table header: %w", err)
-	}
+	rows := make([][]string, 0, len(r.ReportRows))
 	for _, record := range r.ReportRows {
-		cells := []string{
+		rows = append(rows, []string{
 			strconv.Itoa(record.No),
 			record.Name,
 			record.City,
 			record.Email,
 			formatRupiah(record.Value),
 			record.Date.Format("02 Jan 2006"),
-		}
-		if err := addTableRow(m, cells, reportWidths); err != nil {
-			return fmt.Errorf("report table row: %w", err)
-		}
+		})
+	}
+	if err := addTable(m, reportTitles, reportWidths, rows); err != nil {
+		return fmt.Errorf("report table: %w", err)
 	}
 	return nil
 }

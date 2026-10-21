@@ -164,6 +164,44 @@ func addTableRow(m core.Maroto, cells []string, widths []int) error {
 	return nil
 }
 
+// addTable adds a bordered header and data rows, repeating the header after
+// every automatic page break.
+func addTable(m core.Maroto, titles []string, widths []int, rows [][]string) error {
+	if err := addTableHeader(m, titles, widths); err != nil {
+		return err
+	}
+	for i, cells := range rows {
+		if i > 0 && !m.FitlnCurrentPage(tableRowHeight-0.001) {
+			fillCurrentPage(m)
+			if err := addTableHeader(m, titles, widths); err != nil {
+				return err
+			}
+		}
+		if err := addTableRow(m, cells, widths); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// fillCurrentPage adds a blank row with the remaining height so the next row
+// starts a new page; maroto still creates the page itself.
+func fillCurrentPage(m core.Maroto) {
+	lo, hi := 0.0, float64(tableRowHeight)
+	for range 20 {
+		mid := (lo + hi) / 2
+		if m.FitlnCurrentPage(mid) {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	if lo <= 0 {
+		return
+	}
+	m.AddRows(row.New(lo))
+}
+
 // addParagraph adds a wrapped paragraph.
 func addParagraph(m core.Maroto, value string) {
 	m.AddRows(text.NewAutoRow(value, props.Text{Size: 9}))

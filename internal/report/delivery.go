@@ -24,19 +24,17 @@ func AddDelivery(m core.Maroto, r data.Report) error {
 	addDeliveryHeader(m, r)
 	addDeliveryRecipient(m, r.To)
 
-	if err := addTableHeader(m, []string{"Barang", "Qty", "Satuan", "Keterangan"}, deliveryWidths); err != nil {
-		return fmt.Errorf("delivery table header: %w", err)
-	}
+	rows := make([][]string, 0, len(r.DeliveryItems))
 	for _, item := range r.DeliveryItems {
-		cells := []string{
+		rows = append(rows, []string{
 			item.Name,
 			strconv.Itoa(item.Qty),
 			item.Unit,
 			item.Note,
-		}
-		if err := addTableRow(m, cells, deliveryWidths); err != nil {
-			return fmt.Errorf("delivery table row: %w", err)
-		}
+		})
+	}
+	if err := addTable(m, []string{"Barang", "Qty", "Satuan", "Keterangan"}, deliveryWidths, rows); err != nil {
+		return fmt.Errorf("delivery table: %w", err)
 	}
 
 	addDeliverySignatures(m, r)
