@@ -1,59 +1,146 @@
-# generate-pdf (pdfgen)
+# pdfgen
 
-`pdfgen` membuat file PDF **contoh (dummy)** untuk enam jenis dokumen kantor:
-invoice, surat resmi, laporan, kuitansi, surat jalan, dan sertifikat.
+[![CI](https://github.com/ardizariat/generate-pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/ardizariat/generate-pdf/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Go 1.26.1](https://img.shields.io/badge/go-1.26.1-00ADD8?logo=go)](go.mod)
 
-Semua isinya data karangan, bukan data asli, jadi aman dipakai untuk demo, latihan,
-tampilan ke klien, atau menguji aplikasi lain yang membutuhkan contoh PDF. File bisa
-dibuka di pembaca PDF biasa dan lolos pemeriksaan `pdfcpu`.
+`pdfgen` is a small CLI that generates realistic **dummy PDFs** for six common
+Indonesian office documents: invoices, formal letters, reports, receipts, delivery
+notes, and certificates.
 
-Dengan `seed` yang sama, isi PDF selalu sama, sehingga hasilnya bisa diulang untuk
-pengujian. Nama file tetap berbeda tiap kali generate supaya tidak saling menimpa.
+All data is fictional, every output is a valid PDF, and document content is
+reproducible from a seed. Use it for demos, test fixtures, layout checks, or filling
+a staging folder without touching real customer data.
 
-## Persyaratan dan instalasi
+[Versi bahasa Indonesia](README.id.md)
 
-- Go 1.27.3 atau lebih baru.
-- Instalasi ke `$GOBIN`/`$GOPATH/bin` (pastikan direktori tersebut ada di `PATH`):
+![Invoice example](assets/preview.png)
+
+## Features
+
+- Six document types with layouts that look like real office paperwork.
+- Three ways to work: one interactive form, flag-driven single files, or a YAML
+  manifest that generates many files in one run.
+- Exact page targets for table-based documents: content is sized to fill the
+  requested number of pages.
+- Deterministic content from a seed, with unique file names so runs never collide.
+- Page counts measured with [pdfcpu](https://github.com/pdfcpu/pdfcpu); `--verify`
+  additionally validates the whole file.
+- Configuration through flags, environment variables, or a YAML file.
+- No network access; generated documents are entirely local.
+
+## Requirements
+
+- Go 1.26.1 or newer when building from source.
+- Prebuilt binaries need no runtime dependencies.
+
+## Installation
+
+Download the archive for your OS from
+[Releases](https://github.com/ardizariat/generate-pdf/releases), or install with Go:
 
 ```bash
-go install ./cmd/pdfgen
+go install github.com/ardizariat/generate-pdf/cmd/pdfgen@latest
 ```
 
-Alternatif tanpa instalasi: `make build` lalu jalankan `./pdfgen`.
-
-## Cara pakai
-
-Pilih cara yang sesuai kebutuhan:
-
-| Kebutuhan | Cara |
-|---|---|
-| Coba-coba dan ingin dituntun form | jalankan `pdfgen` di terminal |
-| Satu PDF dengan pengaturan tertentu | `pdfgen --no-input` + flag |
-| Banyak PDF sekaligus dengan daftar pengaturan | `pdfgen --batch jobs.yaml` |
-
-### Interaktif
-
-Jalankan di terminal tanpa `--no-input`:
+From a clone:
 
 ```bash
+make build    # builds ./pdfgen
+```
+
+Check the installed version:
+
+```bash
+pdfgen --version
+```
+
+## Quick start
+
+```bash
+# Interactive: one form, then generate
 pdfgen
+
+# One file, no prompt
+pdfgen --no-input
+
+# Several documents from a manifest
+pdfgen --batch jobs.yaml --no-input
 ```
 
-Satu form menanyakan **jumlah file**, **jenis dokumen** (boleh lebih dari satu), dan
-**satu jumlah halaman** yang dipakai untuk semua file. Setelah form selesai generate
-langsung berjalan dan ringkasan dicetak ke stdout.
+Default output goes to `./output/` with a unique name:
 
-### Satu dokumen (noninteraktif)
+```
+output/invoice_20261021T141530Z_0192f3a4-5b6c-7d8e-9f00-112233445566.pdf
+```
+
+## Document types
+
+| `--type` | Default `--rows` | Default `--title` | Content |
+|---|---|---|---|
+| `invoice` | 8 | Invoice | Letterhead, seller/buyer, item table, subtotal/VAT 11%/total, signature |
+| `surat-resmi` | 0 (no table) | Surat Resmi | Letterhead, number, subject, recipient, three paragraphs, signature |
+| `laporan` | 70 | Laporan | Two paragraphs and a table that flows across pages |
+| `kuitansi` | 0 (no table) | Kuitansi | Framed box, amount in digits and words, signature |
+| `surat-jalan` | 25 | Surat Jalan | Recipient, item table, sender and receiver signatures |
+| `sertifikat` | 0 (no table) | Sertifikat | Landscape, large name, award paragraph, verification QR |
+
+`--rows` only affects `invoice`, `laporan`, and `surat-jalan`; it is ignored for the
+other types.
+
+## Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `-t, --type` | `invoice` | Document type: `invoice`, `surat-resmi`, `laporan`, `kuitansi`, `surat-jalan`, `sertifikat` |
+| `-o, --out` | `<out-dir>/<type>_<UTC>_<uuid v7>.pdf` | Exact output path |
+| `--out-dir` | `output` | Base folder for default names and relative paths; created automatically |
+| `-r, --rows` | `-1` (per-type default) | Table rows in single-file mode; ignored for non-table types |
+| `-s, --seed` | `42` | Data seed (`uint64`); `0` means random |
+| `--title` | per type | Document title |
+| `--batch` | empty | YAML manifest of jobs; disables prompts |
+| `--no-input` | `false` | Disable the interactive form |
+| `--force` | `false` | Allow overwriting an existing output file |
+| `--verify` | `false` | Validate the PDF with pdfcpu after writing |
+| `-v, --verbose` | `false` | Info-level logs (default is `warn`) |
+| `--config` | empty | Explicit configuration file |
+| `--version` | | Print the version |
+
+Exit codes: `0` on success, `1` for any failure (invalid configuration, existing
+output without `--force`, cancelled prompt, render or verification error).
+
+## Usage
+
+### Interactive
+
+Run `pdfgen` in a terminal without `--no-input`. A single form asks for:
+
+- the number of files,
+- the document types (multi-select; several types are cycled in order),
+- one page count applied to every file.
+
+Generation starts as soon as the form is submitted; the summary is printed to
+stdout. There is no confirmation step. Cancelling the form exits with code `1`.
+
+Notes:
+
+- If `--type` (or an environment variable/config file) already sets the type, the
+  multi-select is skipped and every file uses that type.
+- `--rows` and `--out` are ignored here. Files go to `--out-dir` with automatic names.
+- A page count above 1 applies only to table types; the other types always get one page.
+
+### Single file (non-interactive)
 
 ```bash
-pdfgen --no-input                                  # invoice default
+pdfgen --no-input
 pdfgen -t laporan -s 7 --no-input --verify
 pdfgen -t sertifikat --title "Sertifikat Pelatihan" --no-input
 pdfgen -t kuitansi --out output/kuitansi.pdf
-pdfgen -t laporan --out-dir hasil --no-input       # tulis ke hasil/
+pdfgen -t laporan --out-dir hasil --no-input
 ```
 
-Pada mode ini `--rows` mengatur jumlah baris tabel; tidak ada opsi jumlah halaman pasti.
+`--rows` controls the table size in this mode. There is no exact-page option; use the
+batch manifest for page targets.
 
 ### Batch
 
@@ -61,70 +148,35 @@ Pada mode ini `--rows` mengatur jumlah baris tabel; tidak ada opsi jumlah halama
 pdfgen --batch jobs.yaml --no-input
 ```
 
-Manifest dan aturan halaman dijelaskan di [Batch dan target halaman](#batch-dan-target-halaman).
+See [Batch and page targets](#batch-and-page-targets).
 
-### Perintah lain
+### Other commands
 
 ```bash
-pdfgen types    # tampilkan jenis dokumen yang didukung
+pdfgen types    # list supported document types
 ```
 
-Bila stdin bukan terminal (mis. pipe/CI), `pdfgen` otomatis memakai mode satu dokumen
-noninteraktif. Nama file default selalu
-`<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf`, dan folder output dibuat otomatis.
-Menimpa file yang sudah ada hanya dengan `--force`.
+When stdin is not a terminal (pipes, CI), `pdfgen` automatically uses single-file
+non-interactive mode. Output folders are created automatically; existing files are
+only replaced with `--force`.
 
-## Jenis dokumen
+## Configuration
 
-| `--type` | Default `--rows` | Default `--title` | Isi |
-|---|---|---|---|
-| `invoice` | 8 | Invoice | Kop, penjual/pembeli, tabel barang, subtotal/PPN 11%/total, tanda tangan |
-| `surat-resmi` | 0 (tanpa tabel) | Surat Resmi | Kop, nomor, perihal, tujuan, tiga paragraf, tanda tangan |
-| `laporan` | 70 | Laporan | Dua paragraf dan tabel yang mengalir multi-halaman |
-| `kuitansi` | 0 (tanpa tabel) | Kuitansi | Kotak berbingkai, nominal angka dan terbilang, tanda tangan |
-| `surat-jalan` | 25 | Surat Jalan | Tujuan, tabel barang, tanda tangan pengirim dan penerima |
-| `sertifikat` | 0 (tanpa tabel) | Sertifikat | Landscape, nama besar, paragraf penghargaan, QR verifikasi |
+Priority, highest first:
 
-`--rows` hanya berpengaruh pada `invoice`, `laporan`, dan `surat-jalan`; untuk jenis
-lain nilainya diabaikan.
+1. CLI flags
+2. `GENPDF_*` environment variables
+3. Configuration file
+4. Defaults (general and per type)
 
-## Flag
+Configuration file lookup:
 
-| Flag | Default | Keterangan |
-|---|---|---|
-| `-t, --type` | `invoice` | Jenis dokumen: `invoice`, `surat-resmi`, `laporan`, `kuitansi`, `surat-jalan`, `sertifikat` |
-| `-o, --out` | `<out-dir>/<type>_<UTC>_<uuid v7>.pdf` | Path output PDF (persis) |
-| `--out-dir` | `output` | Folder dasar output default dan path relatif; dibuat otomatis |
-| `-r, --rows` | `-1` (efektif per jenis) | Jumlah baris tabel mode satu dokumen; diabaikan bila jenis tidak bertabel |
-| `-s, --seed` | `42` | Seed data (`uint64`); `0` berarti acak |
-| `--title` | per jenis | Judul dokumen |
-| `--batch` | kosong | Path manifest YAML berisi daftar job; bila diisi, mode batch dan prompt dilewati |
-| `--no-input` | `false` | Matikan prompt interaktif |
-| `--force` | `false` | Izinkan menimpa file output yang sudah ada |
-| `--verify` | `false` | Validasi PDF dengan pdfcpu setelah file ditulis |
-| `-v, --verbose` | `false` | Log level `info` (default `warn`) |
-| `--config` | kosong | Path file konfigurasi eksplisit |
+- `--config <path>`, or
+- `GENPDF_CONFIG=<path>`, or
+- `generate-pdf.yaml` in the current directory.
 
-Exit code: `0` sukses, `1` untuk kegagalan apa pun (config tidak valid, file tujuan
-sudah ada, prompt dibatalkan, render/verifikasi gagal).
-
-## Konfigurasi
-
-Urutan prioritas (tertinggi ke terendah):
-
-1. Flag CLI
-2. Environment variable `GENPDF_*`
-3. File konfigurasi
-4. Default (umum dan per jenis)
-
-Sumber file, berurutan sesuai prioritas:
-
-- `--config <path>` untuk file eksplisit, atau
-- environment variable `GENPDF_CONFIG=<path>`, atau
-- `generate-pdf.yaml` di direktori kerja saat ini.
-
-File konfigurasi bersifat opsional; bila tidak ada, bukan error. Aplikasi tidak pernah
-menulis file konfigurasi. Nama key sama dengan nama flag:
+The file is optional; a missing file is not an error. `pdfgen` never writes a
+configuration file. Keys match the flag names:
 
 ```yaml
 # generate-pdf.yaml
@@ -135,137 +187,133 @@ out-dir: hasil
 verify: true
 ```
 
-Environment variable memakai prefix `GENPDF_` dengan `-` diganti `_`:
+Environment variables use the `GENPDF_` prefix with `-` replaced by `_`:
 `GENPDF_TYPE`, `GENPDF_OUT`, `GENPDF_OUT_DIR`, `GENPDF_ROWS`, `GENPDF_SEED`,
 `GENPDF_TITLE`, `GENPDF_BATCH`, `GENPDF_NO_INPUT`, `GENPDF_FORCE`, `GENPDF_VERIFY`,
 `GENPDF_VERBOSE`, `GENPDF_CONFIG`.
 
-Config divalidasi setelah semua sumber digabung dan sekali lagi setelah prompt:
-`type` wajib salah satu jenis di atas dan `rows` minimal `0`. Bila `--out` tidak
-diberikan, path dihitung dari `--out-dir` dan nama file otomatis.
+Configuration is validated after merging all sources and again after the interactive
+form: `type` must be one of the supported types and `rows` must be `0` or greater.
+When `--out` is omitted, the path is built from `--out-dir` with an automatic name.
 
-## Mode interaktif dan noninteraktif
+## Batch and page targets
 
-- **Interaktif** aktif bila stdin adalah terminal dan `--no-input` tidak diberikan.
-  Satu form saja: jumlah file, jenis dokumen (multi-select, boleh lebih dari satu), dan
-  satu jumlah halaman yang dipakai untuk semua file. Jenis dipakai berurutan secara
-  berputar bila file lebih banyak daripada jenis.
-  - Bila `--type`/env/file sudah menentukan jenis, field multi-select dilewati dan
-    semua file memakai jenis itu.
-  - `--rows` dan `--out` tidak dipakai di mode ini; lokasi diatur `--out-dir` dan nama
-    file selalu otomatis.
-  - Jumlah halaman > 1 hanya berlaku untuk `invoice`, `laporan`, dan `surat-jalan`;
-    jenis tanpa tabel selalu 1 halaman.
-  - Path output, seed, dan judul tidak ditanyakan: output otomatis
-    `<out-dir>/<type>_<UTC>_<uuid v7>.pdf`, seed dari flag/env/default, judul default
-    per jenis atau `--title`.
-  - Tidak ada konfirmasi; generate langsung berjalan dan ringkasan dicetak setelahnya.
-    Membatalkan form menghasilkan error `input dibatalkan` dan exit code `1`.
-- **Noninteraktif** berlaku bila `--no-input` diberikan, stdin bukan terminal, atau
-  `--batch` digunakan. Semua nilai diambil dari flag, env, file konfigurasi, atau
-  default; tidak ada pertanyaan dan tidak ada pembacaan stdin.
+Batch mode creates **many PDFs at once** without answering a form for each one. It is
+useful for generating dozens or hundreds of fixtures, filling a demo folder, or
+preparing presentation material.
 
-## Batch dan target halaman
+Write a "shopping list" of PDFs in a YAML file called a **manifest**, then run one
+command. Every entry under `jobs` becomes one PDF.
 
-Bagian ini dipakai untuk membuat **banyak PDF sekaligus** tanpa menjawab form satu per
-satu. Cocok saat Anda butuh puluhan atau ratusan file contoh untuk menguji aplikasi,
-mengisi folder demo, atau menyiapkan bahan presentasi.
-
-Caranya: tulis "daftar pesanan" PDF di satu file YAML bernama `jobs.yaml` (disebut
-**manifest**), lalu jalankan satu perintah. Setiap entri di daftar itu menjadi satu file
-PDF.
-
-Contoh: Anda ingin tiga PDF — invoice 2 halaman, laporan 3 halaman, dan surat jalan
-1 halaman.
+Example: an invoice with 2 pages, a report with 3 pages, and a delivery note with
+1 page.
 
 ```yaml
 jobs:
-  - type: invoice       # jenis dokumen
-    pages: 2            # PDF ini harus tepat 2 halaman
-    seed: 7             # penentu isi; seed sama = isi sama
-    out: invoice-a.pdf  # nama file; relatif -> <out-dir>/invoice-a.pdf
+  - type: invoice       # document type
+    pages: 2            # this PDF must be exactly 2 pages
+    seed: 7             # content seed; same seed = same content
+    out: invoice-a.pdf  # relative to <out-dir>/invoice-a.pdf
   - type: laporan
     pages: 3
-    seed: 8             # out tidak ditulis -> nama unik otomatis
-  - type: surat-jalan   # jenis tanpa tabel, wajib 1 halaman
+    seed: 8             # no out -> automatic unique name
+  - type: surat-jalan   # no table, must be 1 page
 ```
 
-Jalankan dengan:
+Run it with:
 
 ```bash
 pdfgen --batch jobs.yaml --no-input
 ```
 
-### Arti tiap kolom
+### Manifest fields
 
-| Kolom | Arti sederhana |
+| Field | Meaning |
 |---|---|
-| `type` | Jenis dokumen yang dibuat. Boleh juga diisi lewat `--type` sebagai default. |
-| `pages` | Jumlah halaman yang **harus** dihasilkan. Default 1. |
-| `seed` | Angka penentu isi. Seed sama menghasilkan isi yang sama; `0` berarti acak. |
-| `out` | Nama/lokasi file. Kosong berarti nama unik otomatis. |
-| `title` | Judul dokumen. Kosong berarti `--title` (bila diberikan) atau judul default sesuai jenis. |
+| `type` | Document type. Can also come from `--type` as a global default. |
+| `pages` | Exact page count. Defaults to 1. |
+| `seed` | Content seed. Same seed produces the same content; `0` means random. |
+| `out` | File name or path. Empty means an automatic unique name. |
+| `title` | Document title. Empty uses `--title` when provided, otherwise the per-type default. |
 
-### Yang perlu diketahui
+### Rules
 
-- **`pages` harus tepat.** Untuk dokumen bertabel, program mengisi baris tabel
-  sebanyak mungkin sampai pas dengan jumlah halaman itu, lalu menghitung halaman
-  dengan `pdfcpu`. Kalau target tidak bisa dicapai, file itu gagal dibuat.
-- **Halaman lebih dari 1 hanya untuk dokumen bertabel**: `invoice`, `laporan`, dan
-  `surat-jalan`. `surat-resmi`, `kuitansi`, dan `sertifikat` selalu 1 halaman.
-- **`--rows` tidak dipakai di mode batch.** Jumlah isi tabel diatur oleh `pages`.
-- **Semua entri diperiksa dulu sebelum menulis file.** Satu entri salah membuat seluruh
-  batch berhenti tanpa menghasilkan file apa pun.
-- **Satu file gagal tidak menghentikan sisanya.** Program lanjut ke entri berikutnya,
-  lalu mencetak ringkasan dan exit code `1` bila ada yang gagal.
-- **`type`, `seed`, dan `title` yang kosong mewarisi pengaturan global** dari
-  flag/env/file konfigurasi. `out` kosong menjadi
-  `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf`; `out` relatif diselesaikan terhadap
-  `--out-dir`, sedangkan path absolut dipakai apa adanya.
-- **`--force`, `--verify`, dan `-v` berlaku untuk semua entri.** Tanpa `--force`, file
-  yang sudah ada tidak ditimpa.
-- **Kolom yang tidak dikenal diabaikan**, dan batch tidak pernah menampilkan form.
+- **`pages` must be exact.** For table documents, the program fills as many table
+  rows as fit the requested page count, then measures the page count with `pdfcpu`.
+  If the target cannot be met, that job fails.
+- **More than one page is only supported for table documents**: `invoice`, `laporan`,
+  and `surat-jalan`. `surat-resmi`, `kuitansi`, and `sertifikat` always use one page.
+- **`--rows` is not used in batch mode.** `pages` controls how much table content is
+  generated.
+- **All entries are validated before any file is written.** One invalid entry stops
+  the whole batch without producing files.
+- **A failed job does not stop the others.** The program continues, prints a summary,
+  and exits with code `1` if anything failed.
+- **Empty `type`, `seed`, and `title` inherit global settings** from flags,
+  environment, or the configuration file. An empty `out` becomes
+  `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf`; relative `out` paths are resolved
+  against `--out-dir`, while absolute paths are used as-is.
+- **`--force`, `--verify`, and `-v` apply to every entry.** Without `--force`,
+  existing files are not overwritten.
+- Unknown fields are ignored, and batch mode never shows a prompt.
 
-### Cara membaca hasilnya
+### Reading the result
 
-Selama proses berjalan, progress muncul di stderr (spinner `[2/3] nama-file.pdf ·
-target 2 halaman`, atau satu baris teks bila bukan terminal). Setelah selesai, stdout
-berisi ringkasan per file, misalnya:
+While jobs run, progress is written to stderr (a spinner such as
+`[2/3] file.pdf · target 2 halaman` in a terminal, or one line per update otherwise).
+Afterwards, stdout contains one summary line per file:
 
 ```
 ok     output/laporan_20261021T141530Z_0192f3a4-....pdf  3 halaman  178697 bytes
 ringkasan: 3 sukses, 0 gagal
 ```
 
-## Perilaku output
+`-v` disables the progress display because zap logs already show each stage.
 
-- Nama default `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf`, mis.
-  `output/invoice_20261021T141530Z_0192f3a4-....pdf`. `--out-dir` default `output`.
-  Timestamp memakai `YYYYMMDDTHHMMSSZ`; UUID v7 dibuat per file.
-- `--out` menang atas `--out-dir` untuk nama file; isinya dipakai persis, termasuk
-  path absolut.
-- Folder output dibuat otomatis (`MkdirAll`), termasuk folder induk dari `--out` atau
-  `out` relatif di manifest. Error hanya bila path ada tapi bukan direktori atau gagal
-  dibuat.
-- Bila file tujuan sudah ada, generate **ditolak** dengan error yang menyebut path dan
-  cara mengizinkannya. `--force` mengizinkan penimpaan. Pada batch, hanya job itu yang
-  gagal dan job lain tetap berjalan.
-- `--verify` memvalidasi hasil dengan pdfcpu setelah file ditulis; verifikasi gagal
-  berarti generate gagal. Jumlah halaman selalu dihitung (lewat pdfcpu) sebagai bagian
-  dari proses generate, terlepas dari `--verify`.
-- Generate baru dinyatakan berhasil setelah file selesai ditulis.
+## Output behavior
 
-## Determinisme
+- Default name: `<out-dir>/<type>_<timestamp UTC>_<uuid v7>.pdf`, for example
+  `output/invoice_20261021T141530Z_0192f3a4-....pdf`. The timestamp format is
+  `YYYYMMDDTHHMMSSZ`; a new UUID v7 is generated per file. `--out-dir` defaults to
+  `output`.
+- `--out` takes precedence over `--out-dir`; the value is used verbatim, including
+  absolute paths.
+- Output folders are created automatically (`MkdirAll`), including parent folders of
+  `--out` or a relative manifest `out`. A path that exists but is not a directory is
+  an error.
+- If the target file exists, generation is **rejected** with an error naming the path
+  and how to allow it. `--force` allows overwriting. In batch mode only that job
+  fails; the others continue.
+- `--verify` validates the result with pdfcpu after writing; a failed verification
+  fails the job. Page counts are always measured with pdfcpu as part of generation,
+  regardless of `--verify`.
+- Generation is only reported as successful after the file has been fully written.
 
-- Seed, jenis, jumlah baris, dan judul yang sama menghasilkan PDF dengan isi dan
-  metadata identik. Nama file **tidak** deterministik karena memakai timestamp dan
-  UUID v7; pakai `--out`/`out` untuk path yang dapat diprediksi.
-- Tanggal dokumen diturunkan dari seed (`time.Unix(seed, 0).UTC()`) dan ID dokumen
-  adalah UUID v5 dari `<type>-<seed>`. Pada batch, setiap job memakai seed-nya sendiri.
-- `--seed 0` berarti data acak; output tidak deterministik.
-- Default seed adalah `42`, sehingga pemakaian tanpa flag tetap dapat direproduksi.
+## Determinism
 
-## Menjalankan test
+- The same seed, type, row count, and title produce identical content and metadata.
+  File names are **not** deterministic because they include a timestamp and a UUID
+  v7; use `--out` or `out` when you need a predictable path.
+- The document date is derived from the seed (`time.Unix(seed, 0).UTC()`) and the
+  document ID is a UUID v5 of `<type>-<seed>`. In batch mode every job uses its own
+  seed.
+- `--seed 0` means random data and produces non-deterministic output.
+- The default seed is `42`, so runs without flags are reproducible.
+
+## Examples
+
+Sample outputs generated with fixed seeds:
+
+| Document | File |
+|---|---|
+| Invoice | [examples/invoice.pdf](examples/invoice.pdf) |
+| Formal letter | [examples/surat-resmi.pdf](examples/surat-resmi.pdf) |
+| Report | [examples/laporan.pdf](examples/laporan.pdf) |
+| Receipt | [examples/kuitansi.pdf](examples/kuitansi.pdf) |
+| Delivery note | [examples/surat-jalan.pdf](examples/surat-jalan.pdf) |
+| Certificate | [examples/sertifikat.pdf](examples/sertifikat.pdf) |
+
+## Development
 
 ```bash
 make build   # go build ./...
@@ -276,10 +324,12 @@ make race    # go test -race ./... -count=1
 make run     # go run ./cmd/pdfgen
 ```
 
-`make lint` membutuhkan `golangci-lint` v2 terpasang. Bila belum tersedia, jalankan
-pemeriksaan setara secara manual:
+`make lint` requires `golangci-lint` v2. Without it, run `go vet ./...` and
+`gofmt -l .`.
 
-```bash
-go vet ./...
-gofmt -l .
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Report security
+issues privately as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Ardi Dzariat
