@@ -29,3 +29,7 @@ Registrasi flag, pemanggilan render, ringkasan hasil generate (ticket 20).
 ## Comments
 
 - Direvisi setelah review UX: interaksi disederhanakan menjadi dua form (jumlah file + multi-select jenis, lalu jumlah halaman per file). Tidak ada lagi prompt seed/output/judul, ringkasan konfirmasi dihapus, jenis diputar berurutan, dan jenis tanpa tabel dipaksa 1 halaman.
+
+## Comments
+
+- Revisi lanjutan: prompt halaman per file diganti satu input "Jumlah halaman per file" yang dipakai untuk semua file, dan semuanya masuk satu form (jumlah file, multi-select jenis, jumlah halaman). Tidak ada lagi layar kedua.

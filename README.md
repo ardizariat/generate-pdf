@@ -95,13 +95,13 @@ Config divalidasi setelah semua sumber digabung dan sekali lagi setelah prompt:
 ## Mode interaktif dan noninteraktif
 
 - **Interaktif** aktif bila stdin adalah terminal dan `--no-input` tidak diberikan.
-  Dua langkah saja: (1) jumlah file dan jenis dokumen (multi-select, boleh lebih dari
-  satu); (2) satu layar berisi jumlah halaman untuk tiap file. Jenis dipakai berurutan
-  secara berputar bila file lebih banyak daripada jenis. Path output, seed, dan judul
-  tidak ditanyakan: output otomatis `<type>-<index>-<seed>.pdf`, seed dari flag/env/
-  default, judul default per jenis atau `--title`. Tidak ada konfirmasi; generate
-  langsung berjalan dan ringkasan dicetak setelahnya. Membatalkan form menghasilkan
-  error `input dibatalkan` dan exit code `1`.
+  Satu form saja: jumlah file, jenis dokumen (multi-select, boleh lebih dari satu), dan
+  satu jumlah halaman yang dipakai untuk semua file. Jenis dipakai berurutan secara
+  berputar bila file lebih banyak daripada jenis. Path output, seed, dan judul tidak
+  ditanyakan: output otomatis `<type>-<index>-<seed>.pdf`, seed dari flag/env/default,
+  judul default per jenis atau `--title`. Tidak ada konfirmasi; generate langsung
+  berjalan dan ringkasan dicetak setelahnya. Membatalkan form menghasilkan error
+  `input dibatalkan` dan exit code `1`.
 - **Noninteraktif** berlaku bila `--no-input` diberikan, stdin bukan terminal, atau
   `--batch` digunakan. Semua nilai diambil dari flag, env, file konfigurasi, atau
   default; tidak ada pertanyaan dan tidak ada pembacaan stdin.

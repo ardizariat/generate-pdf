@@ -23,21 +23,23 @@ var typeLabels = map[string]string{
 }
 
 // IsInteractive reports whether stdin is a terminal, so the CLI can decide
-// whether to show the batch forms.
+// whether to show the batch form.
 func IsInteractive() bool {
 	return isTerminal()
 }
 
-// FillBatch asks for the file count and document types, then one page count per
-// file. Output names, seed, and title come from the configuration defaults.
+// FillBatch asks for the file count, document types, and one page count for
+// all files, in a single form. Output names, seed, and title come from the
+// configuration defaults.
 func FillBatch(cfg config.Config) ([]config.Job, error) {
 	if cfg.NoInput || !isTerminal() {
 		return nil, errors.New("prompt batch membutuhkan terminal interaktif")
 	}
 
 	count := "1"
+	pages := "1"
 	types := []string{cfg.Type}
-	fields := make([]huh.Field, 0, 2)
+	fields := make([]huh.Field, 0, 3)
 	fields = append(fields, huh.NewInput().
 		Title("Jumlah file").
 		Value(&count).
@@ -49,6 +51,11 @@ func FillBatch(cfg config.Config) ([]config.Job, error) {
 			Value(&types).
 			Validate(validateTypes))
 	}
+	fields = append(fields, huh.NewInput().
+		Title("Jumlah halaman per file").
+		Value(&pages).
+		Validate(validatePages))
+
 	if err := huh.NewForm(huh.NewGroup(fields...)).Run(); err != nil {
 		return nil, mapAbort(err)
 	}
@@ -57,49 +64,32 @@ func FillBatch(cfg config.Config) ([]config.Job, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse jumlah file: %w", err)
 	}
-
-	pages := make([]string, total)
-	pageFields := make([]huh.Field, 0, total)
-	for i := range pages {
-		pages[i] = "1"
-		pageFields = append(pageFields, huh.NewInput().
-			Title(fmt.Sprintf("File %d: jumlah halaman", i+1)).
-			Value(&pages[i]).
-			Validate(validatePages))
-	}
-	if err := huh.NewForm(huh.NewGroup(pageFields...)).Run(); err != nil {
-		return nil, mapAbort(err)
+	pageCount, err := strconv.Atoi(pages)
+	if err != nil {
+		return nil, fmt.Errorf("parse jumlah halaman: %w", err)
 	}
 
-	pageCounts := make([]int, 0, total)
-	for _, value := range pages {
-		count, err := strconv.Atoi(value)
-		if err != nil {
-			return nil, fmt.Errorf("parse pages: %w", err)
-		}
-		pageCounts = append(pageCounts, count)
-	}
-
-	return buildJobs(cfg, types, pageCounts)
+	return buildJobs(cfg, types, total, pageCount)
 }
 
-// buildJobs cycles the selected types over the requested page counts. Types
-// without a table always get one page.
-func buildJobs(base config.Config, types []string, pages []int) ([]config.Job, error) {
+// buildJobs cycles the selected types over the file count and applies the same
+// page count to every file. Types without a table always get one page.
+func buildJobs(base config.Config, types []string, files int, pages int) ([]config.Job, error) {
 	if len(types) == 0 {
 		return nil, errors.New("pilih minimal satu jenis dokumen")
 	}
-	if len(pages) == 0 {
+	if files < 1 {
 		return nil, errors.New("minimal satu file")
 	}
 
-	jobs := make([]config.Job, 0, len(pages))
-	for i, pageCount := range pages {
+	jobs := make([]config.Job, 0, files)
+	for i := 0; i < files; i++ {
 		docType := types[i%len(types)]
 		title := typeLabels[docType]
 		if base.Provided("title") {
 			title = base.Title
 		}
+		pageCount := pages
 		if !config.SupportsMultiPage(docType) {
 			pageCount = 1
 		}

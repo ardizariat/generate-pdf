@@ -70,10 +70,11 @@ Presedensi: **flag > env `GENPDF_*` > file config > default**.
 
 ## Interaktif
 
-Aktif bila stdin character device dan `--no-input` false. `huh/v2`, dua form:
+Aktif bila stdin character device dan `--no-input` false. `huh/v2`, satu form:
 
-1. Jumlah file dan multi-select jenis dokumen (boleh lebih dari satu).
-2. Satu layar berisi jumlah halaman per file.
+1. Jumlah file.
+2. Multi-select jenis dokumen (boleh lebih dari satu).
+3. Satu jumlah halaman per file, dipakai sama untuk semua file.
 
 Jenis dipakai berputar sesuai urutan pilihan bila file lebih banyak daripada jenis.
 Jenis tanpa tabel selalu 1 halaman. Output, seed, dan judul tidak ditanyakan: output
