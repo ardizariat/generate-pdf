@@ -12,6 +12,8 @@ builds:
     binary: pdfgen
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goos:
       - linux
       - darwin

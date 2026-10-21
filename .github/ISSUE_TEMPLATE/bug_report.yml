@@ -18,7 +18,7 @@ body:
     id: environment
     attributes:
       label: OS and Go version
-      placeholder: macOS 15, Go 1.26.1
+      placeholder: macOS 15, Go 1.26.10
     validations:
       required: true
   - type: textarea

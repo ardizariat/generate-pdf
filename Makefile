@@ -1,4 +1,4 @@
-.PHONY: build run test fmt lint race
+.PHONY: build run test fmt lint race vuln
 
 build:
 	go build ./...
@@ -18,3 +18,6 @@ lint:
 
 race:
 	go test -race ./... -count=1
+
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
