@@ -1,4 +1,4 @@
-// Package cli berisi perintah cobra. Stub minimal; digantikan ticket 03.
+// Package cli holds the cobra commands. Minimal stub; replaced by ticket 03.
 package cli
 
 import (
@@ -6,7 +6,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// New mengembalikan root command pdfgen.
+// New returns the pdfgen root command.
 func New(logger *zap.Logger) *cobra.Command {
 	return &cobra.Command{
 		Use:           "pdfgen",

@@ -11,7 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// Party adalah pihak yang terlibat dalam dokumen.
+// Party is a party involved in a document.
 type Party struct {
 	Name     string
 	Company  string
@@ -22,7 +22,7 @@ type Party struct {
 	Position string
 }
 
-// InvoiceItem adalah satu baris barang pada invoice.
+// InvoiceItem is one line item on an invoice.
 type InvoiceItem struct {
 	Name     string
 	Qty      int
@@ -30,14 +30,14 @@ type InvoiceItem struct {
 	Subtotal decimal.Decimal
 }
 
-// InvoiceTotals berisi ringkasan nominal invoice; Tax adalah PPN 11%.
+// InvoiceTotals holds the invoice amount summary; Tax is the 11% VAT.
 type InvoiceTotals struct {
 	Subtotal decimal.Decimal
 	Tax      decimal.Decimal
 	Total    decimal.Decimal
 }
 
-// DeliveryItem adalah satu baris barang pada surat jalan.
+// DeliveryItem is one line item on a delivery note.
 type DeliveryItem struct {
 	Name string
 	Qty  int
@@ -45,7 +45,7 @@ type DeliveryItem struct {
 	Note string
 }
 
-// ReportRow adalah satu baris tabel laporan.
+// ReportRow is one row of a report table.
 type ReportRow struct {
 	No    int
 	Name  string
@@ -55,7 +55,7 @@ type ReportRow struct {
 	Date  time.Time
 }
 
-// Report adalah payload lengkap yang dibutuhkan layout PDF.
+// Report is the full payload needed by the PDF layouts.
 type Report struct {
 	Type          string
 	Title         string
@@ -75,7 +75,7 @@ type Report struct {
 	Paragraphs    []string
 }
 
-// typeTitles read-only: judul bawaan per jenis dokumen.
+// typeTitles is read-only: default title per document type.
 var typeTitles = map[string]string{
 	"invoice":     "Invoice",
 	"surat-resmi": "Surat Resmi",
@@ -85,7 +85,7 @@ var typeTitles = map[string]string{
 	"sertifikat":  "Sertifikat",
 }
 
-// proseSentences read-only: kalimat pelengkap paragraf.
+// proseSentences is read-only: filler sentences for paragraphs.
 var proseSentences = [...]string{
 	"Informasi pada dokumen ini disusun secara ringkas dan mudah dibaca.",
 	"Setiap bagian disusun agar dapat dipakai sebagai contoh format resmi.",
@@ -97,11 +97,11 @@ var proseSentences = [...]string{
 	"Format nominal mengikuti gaya penulisan rupiah yang berlaku.",
 }
 
-// Generate membentuk payload dokumen secara deterministik dari jenis, jumlah baris, dan seed.
+// Generate builds the document payload deterministically from type, row count, and seed.
 func Generate(docType string, rows int, seed uint64) (Report, error) {
 	title, ok := typeTitles[docType]
 	if !ok {
-		return Report{}, fmt.Errorf("jenis dokumen tidak dikenal: %q", docType)
+		return Report{}, fmt.Errorf("unknown document type: %q", docType)
 	}
 	if rows < 0 {
 		rows = 0

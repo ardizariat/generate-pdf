@@ -7,14 +7,14 @@ var spellNumbers = [...]string{
 	"enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas",
 }
 
-// Terbilang mengubah angka menjadi kata bahasa Indonesia tanpa kata "rupiah".
-// Rentang yang didukung: sampai triliun.
+// Terbilang spells a number in Indonesian words without the word "rupiah".
+// Supported range: up to trillions.
 func Terbilang(n int64) string {
 	if n == 0 {
 		return "nol"
 	}
 	if n < 0 {
-		// shortcut: math.MinInt64 overflow saat negasi; nominal dokumen tidak sebesar itu.
+		// shortcut: negating math.MinInt64 overflows; document amounts never get that large.
 		return "minus " + Terbilang(-n)
 	}
 	return strings.Join(strings.Fields(spell(n)), " ")

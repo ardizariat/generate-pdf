@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGenerateDeterministik(t *testing.T) {
+func TestGenerateDeterministic(t *testing.T) {
 	first, err := Generate("invoice", 8, 42)
 	require.NoError(t, err)
 	second, err := Generate("invoice", 8, 42)
@@ -23,19 +23,19 @@ func TestGenerateDeterministik(t *testing.T) {
 	assert.NotEqual(t, first.InvoiceItems, other.InvoiceItems)
 }
 
-func TestGenerateJenisTidakDikenal(t *testing.T) {
+func TestGenerateUnknownType(t *testing.T) {
 	_, err := Generate("faktur", 3, 42)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "faktur")
 }
 
-func TestGenerateTanggalDariSeed(t *testing.T) {
+func TestGenerateDateFromSeed(t *testing.T) {
 	report, err := Generate("surat-resmi", 0, 42)
 	require.NoError(t, err)
 	assert.Equal(t, time.Unix(42, 0).UTC(), report.Date)
 }
 
-func TestGenerateJumlahBaris(t *testing.T) {
+func TestGenerateRowCount(t *testing.T) {
 	invoice, err := Generate("invoice", 8, 42)
 	require.NoError(t, err)
 	assert.Len(t, invoice.InvoiceItems, 8)
@@ -45,11 +45,11 @@ func TestGenerateJumlahBaris(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, delivery.DeliveryItems, 25)
 
-	laporan, err := Generate("laporan", 70, 42)
+	reportDoc, err := Generate("laporan", 70, 42)
 	require.NoError(t, err)
-	assert.Len(t, laporan.ReportRows, 70)
-	assert.Equal(t, 1, laporan.ReportRows[0].No)
-	assert.Equal(t, 70, laporan.ReportRows[69].No)
+	assert.Len(t, reportDoc.ReportRows, 70)
+	assert.Equal(t, 1, reportDoc.ReportRows[0].No)
+	assert.Equal(t, 70, reportDoc.ReportRows[69].No)
 
 	for _, typ := range []string{"surat-resmi", "kuitansi", "sertifikat"} {
 		report, err := Generate(typ, 5, 42)
@@ -76,7 +76,7 @@ func TestGenerateInvoiceTotals(t *testing.T) {
 	assert.True(t, report.InvoiceTotals.Total.Equal(subtotal.Add(wantTax)))
 }
 
-func TestGenerateAmountKuitansi(t *testing.T) {
+func TestGenerateReceiptAmount(t *testing.T) {
 	report, err := Generate("kuitansi", 0, 42)
 	require.NoError(t, err)
 
@@ -86,7 +86,7 @@ func TestGenerateAmountKuitansi(t *testing.T) {
 	assert.NotEmpty(t, Terbilang(report.Amount.IntPart()))
 }
 
-func TestGenerateParagraf(t *testing.T) {
+func TestGenerateParagraphs(t *testing.T) {
 	for _, typ := range []string{"invoice", "surat-resmi", "laporan", "kuitansi", "surat-jalan", "sertifikat"} {
 		report, err := Generate(typ, 0, 42)
 		require.NoError(t, err)
@@ -99,7 +99,7 @@ func TestGenerateParagraf(t *testing.T) {
 	}
 }
 
-func TestGeneratePihakLengkap(t *testing.T) {
+func TestGenerateCompleteParty(t *testing.T) {
 	report, err := Generate("surat-resmi", 0, 42)
 	require.NoError(t, err)
 

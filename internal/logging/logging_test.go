@@ -21,20 +21,20 @@ func TestNewLevel(t *testing.T) {
 func TestNewWritesInfoOnlyWhenVerbose(t *testing.T) {
 	var quiet bytes.Buffer
 	quietLogger := newLogger(&quiet, false)
-	quietLogger.Info("tersembunyi")
-	quietLogger.Warn("tampil")
-	assert.NotContains(t, quiet.String(), "tersembunyi")
-	assert.Contains(t, quiet.String(), "tampil")
+	quietLogger.Info("hidden")
+	quietLogger.Warn("shown")
+	assert.NotContains(t, quiet.String(), "hidden")
+	assert.Contains(t, quiet.String(), "shown")
 
 	var verbose bytes.Buffer
 	verboseLogger := newLogger(&verbose, true)
-	verboseLogger.Info("tampil-info")
-	assert.Contains(t, verbose.String(), "tampil-info")
+	verboseLogger.Info("shown-info")
+	assert.Contains(t, verbose.String(), "shown-info")
 }
 
 func TestNewUsesConsoleEncoder(t *testing.T) {
 	var buf bytes.Buffer
-	newLogger(&buf, true).Info("halo", zap.String("jenis", "invoice"))
-	assert.Contains(t, buf.String(), `"jenis": "invoice"`)
+	newLogger(&buf, true).Info("hello", zap.String("type", "invoice"))
+	assert.Contains(t, buf.String(), `"type": "invoice"`)
 	assert.NotContains(t, buf.String(), `{"level"`)
 }

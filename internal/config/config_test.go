@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newCommand meniru flag yang didaftarkan package cli, tanpa menjalankan perintah.
+// newCommand mimics the flags registered by package cli without running the command.
 func newCommand(t *testing.T, args ...string) *cobra.Command {
 	t.Helper()
 
@@ -148,12 +148,12 @@ func TestLoadDefaultsPerType(t *testing.T) {
 func TestProvided(t *testing.T) {
 	t.Chdir(t.TempDir())
 	writeConfigFile(t, ".", "rows: 5\n")
-	t.Setenv("GENPDF_TITLE", "Judul Env")
+	t.Setenv("GENPDF_TITLE", "Env Title")
 
 	cfg, err := Load(newCommand(t, "--force"))
 	require.NoError(t, err)
 
-	assert.True(t, cfg.Provided("rows"), "file config")
+	assert.True(t, cfg.Provided("rows"), "config file")
 	assert.True(t, cfg.Provided("title"), "env")
 	assert.True(t, cfg.Provided("force"), "flag")
 	assert.False(t, cfg.Provided("out"))
@@ -191,9 +191,9 @@ func TestLoadMissingConfigFileIsNotError(t *testing.T) {
 func TestLoadExplicitMissingConfigFileIsError(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	_, err := Load(newCommand(t, "--config", "tidak-ada.yaml"))
+	_, err := Load(newCommand(t, "--config", "missing.yaml"))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "baca config")
+	assert.Contains(t, err.Error(), "read config")
 }
 
 func TestValidate(t *testing.T) {
@@ -207,22 +207,22 @@ func TestValidate(t *testing.T) {
 			cfg:  Config{Type: TypeInvoice, Out: "invoice-42.pdf"},
 		},
 		{
-			name:    "jenis tak dikenal",
+			name:    "unknown type",
 			cfg:     Config{Type: "faktur", Out: "faktur-42.pdf"},
 			wantErr: []string{"Type", "faktur", "oneof"},
 		},
 		{
-			name:    "rows negatif",
+			name:    "negative rows",
 			cfg:     Config{Type: TypeInvoice, Out: "invoice-42.pdf", Rows: -1},
 			wantErr: []string{"Rows", "-1", "gte"},
 		},
 		{
-			name:    "out kosong",
+			name:    "empty out",
 			cfg:     Config{Type: TypeInvoice},
 			wantErr: []string{"Out", "required"},
 		},
 		{
-			name: "seed nol diizinkan",
+			name: "zero seed is allowed",
 			cfg:  Config{Type: TypeReceipt, Out: "kuitansi-0.pdf", Seed: 0},
 		},
 	}

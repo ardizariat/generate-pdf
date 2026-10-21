@@ -1,7 +1,7 @@
 package data
 
-// Data referensi Indonesia untuk dokumen dummy. Semua slice berupa array
-// agar tidak dapat diubah saat runtime.
+// Indonesian reference data for dummy documents. Every slice is an array
+// so it cannot be changed at runtime.
 
 var firstNames = [...]string{
 	"Budi", "Siti", "Agus", "Dewi", "Rizky", "Andi",

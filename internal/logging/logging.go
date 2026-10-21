@@ -1,4 +1,4 @@
-// Package logging membuat logger zap untuk aplikasi.
+// Package logging builds the application's zap logger.
 package logging
 
 import (
@@ -9,8 +9,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// New membuat logger console ke stderr: level warn default, info bila verbose.
-// Logger dikembalikan dan diteruskan sebagai parameter; tidak ada state global.
+// New returns a console logger writing to stderr: warn level by default, info when verbose.
+// The logger is returned and passed as a parameter; there is no global state.
 func New(verbose bool) *zap.Logger {
 	return newLogger(os.Stderr, verbose)
 }

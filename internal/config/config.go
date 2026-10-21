@@ -1,5 +1,5 @@
-// Package config menggabungkan sumber konfigurasi (flag, env, file, default)
-// menjadi satu Config dan memvalidasinya.
+// Package config merges configuration sources (flags, env, file, defaults)
+// into a single Config and validates it.
 package config
 
 import (
@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Jenis dokumen yang didukung.
+// Supported document types.
 const (
 	TypeInvoice     = "invoice"
 	TypeLetter      = "surat-resmi"
@@ -23,7 +23,7 @@ const (
 	TypeCertificate = "sertifikat"
 )
 
-// typeList menjadi sumber tunggal daftar jenis; dipakai juga oleh tag validator.
+// typeList is the single source of the type list; also used by the validator tag.
 const typeList = TypeInvoice + "," + TypeLetter + "," + TypeReport + "," + TypeReceipt + "," + TypeDelivery + "," + TypeCertificate
 
 const (
@@ -31,7 +31,7 @@ const (
 	configName = "generate-pdf"
 )
 
-// configKeys read-only: key viper = nama flag.
+// configKeys is read-only: viper key = flag name.
 var configKeys = [...]string{"type", "out", "rows", "seed", "title", "no-input", "force", "verify", "verbose", "config"}
 
 type defaults struct {
@@ -39,7 +39,7 @@ type defaults struct {
 	title string
 }
 
-// typeDefaults bersifat read-only setelah inisialisasi.
+// typeDefaults is read-only after initialization.
 var typeDefaults = map[string]defaults{
 	TypeInvoice:     {rows: 8, title: "Invoice"},
 	TypeLetter:      {rows: 0, title: "Surat Resmi"},
@@ -49,12 +49,12 @@ var typeDefaults = map[string]defaults{
 	TypeCertificate: {rows: 0, title: "Sertifikat"},
 }
 
-// Types mengembalikan daftar jenis dokumen yang didukung.
+// Types returns the supported document types.
 func Types() []string {
 	return strings.Split(typeList, ",")
 }
 
-// Config adalah representasi final konfigurasi setelah semua sumber digabungkan.
+// Config is the final configuration after all sources are merged.
 type Config struct {
 	Type       string `validate:"required,oneof=invoice surat-resmi laporan kuitansi surat-jalan sertifikat"`
 	Out        string `validate:"required"`
@@ -70,12 +70,12 @@ type Config struct {
 	provided map[string]bool
 }
 
-// Provided melaporkan apakah key datang dari flag yang berubah, env GENPDF_*, atau file config.
+// Provided reports whether key came from a changed flag, a GENPDF_* env var, or a config file.
 func (c Config) Provided(key string) bool {
 	return c.provided[key]
 }
 
-// Load menggabungkan flag, env GENPDF_*, file config, dan default per jenis.
+// Load merges flags, GENPDF_* env vars, config file, and per-type defaults.
 func Load(cmd *cobra.Command) (Config, error) {
 	v := viper.New()
 	v.SetEnvPrefix(envPrefix)
@@ -130,7 +130,7 @@ func Load(cmd *cobra.Command) (Config, error) {
 	return loose, nil
 }
 
-// Validate memeriksa Config; dipanggil setelah Load dan setelah prompt.
+// Validate checks Config; it is called after Load and again after prompting.
 func Validate(c Config) error {
 	err := validator.New().Struct(c)
 	if err == nil {
@@ -139,14 +139,14 @@ func Validate(c Config) error {
 
 	var invalid validator.ValidationErrors
 	if !errors.As(err, &invalid) {
-		return fmt.Errorf("validasi config: %w", err)
+		return fmt.Errorf("validate config: %w", err)
 	}
 
 	messages := make([]string, 0, len(invalid))
 	for _, fieldErr := range invalid {
 		messages = append(messages, validationMessage(fieldErr))
 	}
-	return fmt.Errorf("config tidak valid: %s", strings.Join(messages, "; "))
+	return fmt.Errorf("invalid config: %s", strings.Join(messages, "; "))
 }
 
 func validationMessage(fieldErr validator.FieldError) string {
@@ -168,7 +168,7 @@ func readConfigFile(v *viper.Viper, cmd *cobra.Command) error {
 	err := v.ReadInConfig()
 	var notFound viper.ConfigFileNotFoundError
 	if err != nil && !errors.As(err, &notFound) {
-		return fmt.Errorf("baca config: %w", err)
+		return fmt.Errorf("read config: %w", err)
 	}
 	return nil
 }

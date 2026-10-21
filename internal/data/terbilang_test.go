@@ -31,7 +31,7 @@ func TestTerbilang(t *testing.T) {
 	}
 }
 
-func TestTerbilangTanpaDigitAtauSpasiGanda(t *testing.T) {
+func TestTerbilangWithoutDigitsOrDoubleSpaces(t *testing.T) {
 	got := Terbilang(12_345_678)
 	assert.NotContains(t, got, "  ")
 	assert.False(t, strings.ContainsAny(got, "0123456789"), got)
