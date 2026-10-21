@@ -38,6 +38,7 @@ README.md, Makefile, .golangci.yml, .gitignore
 
 ```
 generate-pdf [flags]
+generate-pdf --batch jobs.yaml
 generate-pdf types
 ```
 
@@ -48,6 +49,7 @@ generate-pdf types
 | `-r/--rows` | per jenis | invoice 8, laporan 70, surat-jalan 25, sisanya 0 (diabaikan) |
 | `-s/--seed` | 42 | `uint64`; 0 berarti acak (determinisme tidak berlaku) |
 | `--title` | per jenis | judul dokumen |
+| `--batch` | kosong | path manifest YAML berisi daftar job; bila diisi, mode batch |
 | `--no-input` | false | matikan prompt |
 | `--force` | false | izinkan menimpa file output yang sudah ada |
 | `--verify` | false | validasi pdfcpu + hitung halaman setelah tulis |
@@ -61,7 +63,7 @@ Exit code: `0` sukses, `1` kegagalan apa pun. Hanya `main.go` yang memanggil `os
 Presedensi: **flag > env `GENPDF_*` > file config > default**.
 
 - File: `--config`, atau `generate-pdf.yaml` di cwd; tidak ada bukan error; tidak pernah ditulis.
-- Env prefix `GENPDF_`, `-` → `_`.
+- Env prefix `GENPDF_`, `-` → `_`. Semua key flag dapat datang dari env/file, termasuk `batch`.
 - `config.Load(cmd)` melakukan penggabungan sumber, default per jenis, dan menghitung `Provided(key) bool` untuk flag/env/file sehingga package `prompt` tidak perlu menyentuh viper.
 - `config.Validate(cfg)` diekspor dan dipanggil dua kali: setelah load, dan setelah prompt (final validation).
 - Tag `validator/v10`: `type` `required,oneof=...`, `rows` `gte=0`, `out` `required`. Pesan menyebut field dan nilai.
@@ -70,10 +72,46 @@ Presedensi: **flag > env `GENPDF_*` > file config > default**.
 
 Aktif bila stdin character device dan `--no-input` false. `huh/v2`:
 
-1. Select jenis dokumen.
-2. Input rows (prefill default jenis; dilewati bila jenis tanpa tabel), seed, path output.
+1. Input jumlah file (default 1, minimal 1).
+2. Untuk setiap file, satu form: select jenis, jumlah halaman (default 1), seed, path output.
+3. Ringkasan seluruh job dan konfirmasi sebelum generate.
 
-Field yang `Provided` tidak ditanyakan. Pembatalan pengguna dikembalikan sebagai error eksplisit ("dibatalkan"), bukan panic. Setelah prompt, `config.Validate` dijalankan ulang.
+`--rows` tidak ditanyakan pada mode interaktif; jumlah halaman yang mengatur isi
+tabel. Field yang `Provided` tidak ditanyakan. Pembatalan pengguna dikembalikan
+sebagai error eksplisit ("dibatalkan"), bukan panic. Setelah prompt, validasi batch
+dijalankan ulang.
+
+## Batch dan target halaman
+
+Mode batch aktif bila `--batch <path>` diisi. Manifest YAML:
+
+```yaml
+jobs:
+  - type: invoice
+    pages: 2
+    seed: 7
+    out: out/invoice-a.pdf
+    title: Invoice A
+  - type: laporan
+    pages: 3
+```
+
+- `jobs` wajib berisi minimal satu entri; field tidak dikenal bukan error.
+- Field job (`type`, `pages`, `seed`, `out`, `title`) menimpa nilai global
+  (flag/env/file/default); field kosong mewarisi global. `out` kosong →
+  `<type>-<index>-<seed>.pdf`, index mulai 1.
+- `pages` wajib ≥ 1, default 1. `pages` > 1 hanya untuk `invoice`, `laporan`,
+  `surat-jalan`; jenis lain wajib 1 halaman.
+- Seluruh daftar job divalidasi sebelum render; satu job tidak valid menggagalkan
+  batch tanpa menulis file apa pun.
+- Jumlah halaman harus tepat. Isi diisi semaksimal mungkin untuk jumlah halaman
+  itu: jumlah baris dicari secara monoton (render, hitung halaman dengan pdfcpu,
+  sesuaikan) sampai tepat. Target tidak tercapai → job gagal.
+- Satu job gagal tidak menghentikan job lain. Ringkasan per file dicetak, exit code
+  `1` bila ada yang gagal.
+- `--force`, `--verify`, `-v` berlaku global untuk semua job. File yang sudah ada
+  tanpa `--force` membuat job itu gagal, bukan ditimpa.
+- Batch tidak pernah interaktif; manifest harus lengkap tanpa prompt.
 
 ## Perilaku output
 
@@ -87,6 +125,7 @@ Field yang `Provided` tidak ditanyakan. Pembatalan pengguna dikembalikan sebagai
 - ID dokumen `uuid.NewSHA1(uuid.NameSpaceOID, []byte("<type>-<seed>"))`.
 - Satu instance `gofakeit.New(seed)` yang diteruskan eksplisit; tanpa faker global.
 - Tidak ada `time.Now()` di isi dokumen maupun metadata.
+- Setiap job memakai seed-nya sendiri; job dengan input sama menghasilkan byte identik.
 
 ## Struktur dokumen
 
@@ -144,7 +183,7 @@ Zap console encoder ke stderr; `warn` default, `info` dengan `-v`. Satu ringkasa
 
 ## Dokumentasi & tooling
 
-- `README.md`: tujuan, instalasi, cara pakai, jenis dokumen, tabel flag + default, sumber config + prioritas, mode interaktif/noninteraktif, perilaku output (termasuk `--force`), cara test.
+- `README.md`: tujuan, instalasi, cara pakai (termasuk batch + contoh manifest), jenis dokumen, tabel flag + default (termasuk `--batch`), sumber config + prioritas, mode interaktif/noninteraktif, perilaku output (termasuk `--force`), target halaman, cara test.
 - `Makefile`: `build`, `test`, `lint`, `fmt`, `run`.
 - `.golangci.yml`: minimal `govet`, `errcheck`, `staticcheck`, `gofmt`.
 - `.gitignore`: binary hasil build dan `*.pdf` di root.
@@ -161,6 +200,10 @@ golangci-lint run
 
 Plus: keenam jenis di-generate ke `/tmp/opencode/pdfcheck/` dengan `--no-input --verify -v`, semuanya lolos validasi, halaman sesuai tabel, dan `--force` salah satu file membuktikan perilaku overwrite.
 
+Plus batch: manifest tiga job (`pages` 1, 2, 3) menghasilkan tiga file dengan jumlah
+halaman tepat sesuai target, semua lolos `--verify`, dan satu job gagal tidak
+menghentikan job lain (exit 1, ringkasan menyebut file yang gagal).
+
 ## Non-goals
 
-HTTP server, gambar dari file, tanda tangan berbasis aset, Dockerfile, CI pipeline, flag di luar tabel di atas.
+HTTP server, gambar dari file, tanda tangan berbasis aset, Dockerfile, CI pipeline, flag di luar tabel di atas, generate paralel, override `verify`/`force` per job, dan halaman kosong dekoratif.
