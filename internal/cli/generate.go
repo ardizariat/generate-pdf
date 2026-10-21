@@ -12,6 +12,7 @@ import (
 
 	"github.com/ardizariat/generate-pdf/internal/config"
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 	"github.com/ardizariat/generate-pdf/internal/logging"
 	"github.com/ardizariat/generate-pdf/internal/prompt"
 	"github.com/ardizariat/generate-pdf/internal/report"
@@ -24,10 +25,10 @@ var newLogger = logging.New
 func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
 	cfg, err := config.Load(cmd)
 	if err != nil {
-		return fmt.Errorf("muat config: %w", err)
+		return fmt.Errorf("load config: %w", err)
 	}
 	if err := config.Validate(cfg); err != nil {
-		return fmt.Errorf("validasi config: %w", err)
+		return fmt.Errorf("validate config: %w", err)
 	}
 
 	// main builds a warn-level logger before flags are parsed, so verbose
@@ -39,7 +40,7 @@ func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
 	if cfg.Batch != "" {
 		jobs, err := config.LoadBatch(cfg.Batch, cfg)
 		if err != nil {
-			return fmt.Errorf("muat batch: %w", err)
+			return fmt.Errorf("load batch: %w", err)
 		}
 		return runBatch(cmd, logger, cfg, jobs)
 	}
@@ -47,17 +48,17 @@ func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
 	if !cfg.NoInput && prompt.IsInteractive() {
 		jobs, err := prompt.FillBatch(cfg)
 		if err != nil {
-			return fmt.Errorf("isi prompt: %w", err)
+			return fmt.Errorf("fill prompt: %w", err)
 		}
 		return runBatch(cmd, logger, cfg, jobs)
 	}
 
 	if _, err := os.Stat(cfg.Out); err == nil {
 		if !cfg.Force {
-			return fmt.Errorf("file %s sudah ada; gunakan --force untuk menimpa", cfg.Out)
+			return fmt.Errorf("file %s already exists; use --force to overwrite", cfg.Out)
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("cek %s: %w", cfg.Out, err)
+		return fmt.Errorf("check %s: %w", cfg.Out, err)
 	}
 
 	if err := ensureParentDir(cfg.Out); err != nil {
@@ -65,28 +66,29 @@ func runGenerate(cmd *cobra.Command, logger *zap.Logger) error {
 	}
 
 	start := time.Now()
+	labels := locale.Get(locale.OrDefault(cfg.Language))
 
 	var pages int
 	var size int64
 	var genErr error
-	progress(cfg, fmt.Sprintf("[1/1] %s · target %d baris", cfg.Out, cfg.Rows), func() {
-		payload, err := data.Generate(cfg.Type, cfg.Rows, cfg.Seed)
+	progress(cfg, fmt.Sprintf(labels.ProgressRows, 1, 1, cfg.Out, cfg.Rows), func() {
+		payload, err := data.Generate(cfg.Type, cfg.Rows, cfg.Seed, locale.OrDefault(cfg.Language))
 		if err != nil {
-			genErr = fmt.Errorf("buat data %s: %w", cfg.Type, err)
+			genErr = fmt.Errorf("build data %s: %w", cfg.Type, err)
 			return
 		}
 		payload.Title = cfg.Title
 
 		pages, size, genErr = report.Generate(payload, cfg.Out, cfg.Verify)
 		if genErr != nil {
-			genErr = fmt.Errorf("buat pdf %s: %w", cfg.Out, genErr)
+			genErr = fmt.Errorf("build pdf %s: %w", cfg.Out, genErr)
 		}
 	})
 	if genErr != nil {
 		return genErr
 	}
 
-	logger.Info("generate selesai",
+	logger.Info("generate complete",
 		zap.String("type", cfg.Type),
 		zap.String("out", cfg.Out),
 		zap.Int("rows", cfg.Rows),
@@ -105,7 +107,7 @@ func ensureParentDir(path string) error {
 		return nil
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("buat direktori %s: %w", dir, err)
+		return fmt.Errorf("create directory %s: %w", dir, err)
 	}
 	return nil
 }

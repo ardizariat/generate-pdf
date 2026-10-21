@@ -12,21 +12,23 @@ import (
 	"github.com/johnfercher/maroto/v2/pkg/props"
 
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 // AddLetter renders the formal letter layout using only the data payload.
 func AddLetter(m core.Maroto, r data.Report) error {
+	labels := locale.Get(r.Language)
 	addLetterHeader(m, r.From)
-	addLetterMeta(m, r)
-	addLetterRecipient(m, r.To)
+	addLetterMeta(m, r, labels)
+	addLetterRecipient(m, r.To, labels)
 
-	addParagraph(m, "Dengan hormat,")
+	addParagraph(m, labels.Dear)
 	for _, paragraph := range r.Paragraphs {
 		addParagraph(m, paragraph)
 		m.AddRows(row.New(2))
 	}
 
-	addLetterClosing(m, r.From)
+	addLetterClosing(m, r.From, labels)
 	return nil
 }
 
@@ -49,11 +51,11 @@ func addLetterHeader(m core.Maroto, from data.Party) {
 }
 
 // addLetterMeta adds the letter reference lines.
-func addLetterMeta(m core.Maroto, r data.Report) {
+func addLetterMeta(m core.Maroto, r data.Report, labels locale.Labels) {
 	metaRows := []string{
-		"Nomor: " + r.Number,
-		"Tanggal: " + r.Date.Format("02 Jan 2006"),
-		"Perihal: " + r.Purpose,
+		labels.Ref + ": " + r.Number,
+		labels.Date + ": " + locale.FormatDate(r.Language, r.Date),
+		labels.Subject + ": " + r.Purpose,
 	}
 	for _, meta := range metaRows {
 		m.AddRows(row.New(5).Add(
@@ -64,9 +66,9 @@ func addLetterMeta(m core.Maroto, r data.Report) {
 }
 
 // addLetterRecipient adds the addressee block.
-func addLetterRecipient(m core.Maroto, to data.Party) {
+func addLetterRecipient(m core.Maroto, to data.Party, labels locale.Labels) {
 	m.AddRows(row.New(5).Add(
-		col.New(gridSize).Add(text.New("Kepada Yth.", props.Text{Size: 9})),
+		col.New(gridSize).Add(text.New(labels.Attn, props.Text{Size: 9})),
 	))
 	m.AddRows(row.New(5).Add(
 		col.New(gridSize).Add(text.New(to.Name, props.Text{Size: 9, Style: fontstyle.Bold})),
@@ -81,10 +83,10 @@ func addLetterRecipient(m core.Maroto, to data.Party) {
 }
 
 // addLetterClosing adds the right-aligned signature block.
-func addLetterClosing(m core.Maroto, from data.Party) {
+func addLetterClosing(m core.Maroto, from data.Party, labels locale.Labels) {
 	m.AddRows(row.New(6).Add(
 		col.New(6),
-		col.New(6).Add(text.New("Hormat kami,", props.Text{Size: 9})),
+		col.New(6).Add(text.New(labels.Sincerely, props.Text{Size: 9})),
 	))
 	m.AddRows(row.New(18).Add(
 		col.New(6),

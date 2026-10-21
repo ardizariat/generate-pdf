@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 func TestGeneratePagesExactTarget(t *testing.T) {
@@ -19,22 +20,22 @@ func TestGeneratePagesExactTarget(t *testing.T) {
 		{docType: "invoice", pages: 1},
 		{docType: "invoice", pages: 2},
 		{docType: "invoice", pages: 3},
-		{docType: "laporan", pages: 1},
-		{docType: "laporan", pages: 2},
-		{docType: "laporan", pages: 3},
-		{docType: "surat-jalan", pages: 1},
-		{docType: "surat-jalan", pages: 2},
-		{docType: "surat-jalan", pages: 3},
-		{docType: "surat-resmi", pages: 1},
-		{docType: "kuitansi", pages: 1},
-		{docType: "sertifikat", pages: 1},
+		{docType: "report", pages: 1},
+		{docType: "report", pages: 2},
+		{docType: "report", pages: 3},
+		{docType: "delivery-note", pages: 1},
+		{docType: "delivery-note", pages: 2},
+		{docType: "delivery-note", pages: 3},
+		{docType: "letter", pages: 1},
+		{docType: "receipt", pages: 1},
+		{docType: "certificate", pages: 1},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.docType, func(t *testing.T) {
 			out := filepath.Join(t.TempDir(), "out.pdf")
 			build := func(rows int) (data.Report, error) {
-				return data.Generate(tc.docType, rows, 42)
+				return data.Generate(tc.docType, rows, 42, locale.English)
 			}
 
 			rows, pages, size, err := GeneratePages(build, out, tc.pages, true)
@@ -53,7 +54,7 @@ func TestGeneratePagesExactTarget(t *testing.T) {
 func TestGeneratePagesIsDeterministic(t *testing.T) {
 	dir := t.TempDir()
 	build := func(rows int) (data.Report, error) {
-		return data.Generate("invoice", rows, 42)
+		return data.Generate("invoice", rows, 42, locale.English)
 	}
 
 	first := filepath.Join(dir, "first.pdf")
@@ -73,12 +74,12 @@ func TestGeneratePagesIsDeterministic(t *testing.T) {
 func TestGeneratePagesRejectsInvalidTarget(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "out.pdf")
 	build := func(rows int) (data.Report, error) {
-		return data.Generate("invoice", rows, 42)
+		return data.Generate("invoice", rows, 42, locale.English)
 	}
 
 	_, _, _, err := GeneratePages(build, out, 0, true)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "target halaman")
+	assert.Contains(t, err.Error(), "target pages")
 
 	_, statErr := os.Stat(out)
 	assert.ErrorIs(t, statErr, os.ErrNotExist)
@@ -87,7 +88,7 @@ func TestGeneratePagesRejectsInvalidTarget(t *testing.T) {
 func TestGeneratePagesUnreachableTarget(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "out.pdf")
 	build := func(rows int) (data.Report, error) {
-		return data.Generate("laporan", rows, 42)
+		return data.Generate("report", rows, 42, locale.English)
 	}
 
 	_, _, _, err := GeneratePages(build, out, 1000, true)

@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/ardizariat/generate-pdf/internal/config"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 // execute runs the root command with args and captures its output.
@@ -47,7 +48,7 @@ func TestTypesListsAllDocumentTypes(t *testing.T) {
 
 	assert.Equal(t, config.Types(), listed, "urutan dan isi harus sama dengan config.Types()")
 	for _, docType := range config.Types() {
-		assert.Contains(t, out, typeDescriptions[docType])
+		assert.Contains(t, out, locale.Get(locale.English).TypeDescriptions[docType])
 	}
 }
 
@@ -88,9 +89,9 @@ func TestOverwriteRequiresForce(t *testing.T) {
 }
 
 func TestGenerateWithVerify(t *testing.T) {
-	out := filepath.Join(t.TempDir(), "kuitansi.pdf")
+	out := filepath.Join(t.TempDir(), "receipt.pdf")
 
-	_, err := execute(t, "-t", "kuitansi", "-o", out, "--no-input", "--verify")
+	_, err := execute(t, "-t", "receipt", "-o", out, "--no-input", "--verify")
 	require.NoError(t, err)
 
 	info, err := os.Stat(out)
@@ -121,5 +122,5 @@ func TestVerboseSelectsInfoLogger(t *testing.T) {
 	entries := logs.All()
 	require.Len(t, entries, 1)
 	assert.Equal(t, zapcore.InfoLevel, entries[0].Level)
-	assert.Equal(t, "generate selesai", entries[0].Message)
+	assert.Equal(t, "generate complete", entries[0].Message)
 }

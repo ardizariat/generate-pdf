@@ -21,10 +21,10 @@ func TestSingleCreatesOutputDir(t *testing.T) {
 func TestSingleDefaultLandsInOutputDir(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	_, err := execute(t, "-t", "kuitansi", "--no-input")
+	_, err := execute(t, "-t", "receipt", "--no-input")
 	require.NoError(t, err)
 
-	matches, err := filepath.Glob(filepath.Join("output", "kuitansi_*.pdf"))
+	matches, err := filepath.Glob(filepath.Join("output", "receipt_*.pdf"))
 	require.NoError(t, err)
 	require.Len(t, matches, 1)
 }
@@ -33,8 +33,8 @@ func TestBatchUsesOutDirForDefaultsAndRelativePaths(t *testing.T) {
 	outDir := filepath.Join(t.TempDir(), "hasil")
 	batch := writeBatch(t, `jobs:
   - type: invoice
-  - type: laporan
-    out: nested/laporan.pdf
+  - type: report
+    out: nested/report.pdf
 `)
 
 	_, err := execute(t, "--batch", batch, "--out-dir", outDir, "--no-input")
@@ -44,6 +44,6 @@ func TestBatchUsesOutDirForDefaultsAndRelativePaths(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, matches, 1)
 
-	_, err = os.Stat(filepath.Join(outDir, "nested", "laporan.pdf"))
+	_, err = os.Stat(filepath.Join(outDir, "nested", "report.pdf"))
 	require.NoError(t, err)
 }

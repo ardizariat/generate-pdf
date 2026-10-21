@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 func TestReportDocumentLayout(t *testing.T) {
@@ -25,7 +26,7 @@ func TestReportDocumentLayout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, err := data.Generate("laporan", tt.rows, 42)
+			r, err := data.Generate("report", tt.rows, 42, locale.English)
 			require.NoError(t, err)
 			require.Len(t, r.ReportRows, tt.rows)
 
@@ -36,7 +37,7 @@ func TestReportDocumentLayout(t *testing.T) {
 			doc, err := m.Generate()
 			require.NoError(t, err)
 
-			path := filepath.Join(t.TempDir(), "laporan.pdf")
+			path := filepath.Join(t.TempDir(), "report.pdf")
 			require.NoError(t, doc.Save(path))
 			require.NoError(t, api.ValidateFile(path, model.NewDefaultConfiguration()))
 

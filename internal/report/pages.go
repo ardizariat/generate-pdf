@@ -18,12 +18,12 @@ const maxFitRows = 2000
 // finds that maximum without guessing row density.
 func GeneratePages(build func(rows int) (data.Report, error), out string, targetPages int, verify bool) (rows int, pages int, size int64, err error) {
 	if targetPages < 1 {
-		return 0, 0, 0, fmt.Errorf("target halaman harus >= 1, dapat %d", targetPages)
+		return 0, 0, 0, fmt.Errorf("target pages must be >= 1, got %d", targetPages)
 	}
 
 	tmpDir, err := os.MkdirTemp("", "pdfgen-pages-*")
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("buat direktori sementara: %w", err)
+		return 0, 0, 0, fmt.Errorf("create temporary directory: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
@@ -34,12 +34,12 @@ func GeneratePages(build func(rows int) (data.Report, error), out string, target
 		}
 		r, err := build(rowCount)
 		if err != nil {
-			return 0, fmt.Errorf("buat data %d baris: %w", rowCount, err)
+			return 0, fmt.Errorf("build data for %d rows: %w", rowCount, err)
 		}
 		path := filepath.Join(tmpDir, fmt.Sprintf("rows-%d.pdf", rowCount))
 		count, _, err := Generate(r, path, false)
 		if err != nil {
-			return 0, fmt.Errorf("render %d baris: %w", rowCount, err)
+			return 0, fmt.Errorf("render %d rows: %w", rowCount, err)
 		}
 		counts[rowCount] = count
 		return count, nil
@@ -60,7 +60,7 @@ func GeneratePages(build func(rows int) (data.Report, error), out string, target
 			if count == targetPages {
 				break
 			}
-			return 0, 0, 0, fmt.Errorf("target %d halaman tidak tercapai (maksimum %d halaman pada %d baris)", targetPages, count, hi)
+			return 0, 0, 0, fmt.Errorf("target %d pages not reached (maximum %d pages at %d rows)", targetPages, count, hi)
 		}
 		if hi > maxFitRows/2 {
 			hi = maxFitRows
@@ -87,16 +87,16 @@ func GeneratePages(build func(rows int) (data.Report, error), out string, target
 		return 0, 0, 0, err
 	}
 	if count != targetPages {
-		return 0, 0, 0, fmt.Errorf("target %d halaman tidak tercapai (terbaik %d halaman pada %d baris)", targetPages, count, lo)
+		return 0, 0, 0, fmt.Errorf("target %d pages not reached (best %d pages at %d rows)", targetPages, count, lo)
 	}
 
 	r, err := build(lo)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("buat data %d baris: %w", lo, err)
+		return 0, 0, 0, fmt.Errorf("build data for %d rows: %w", lo, err)
 	}
 	staged, err := stagePath(out)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("buat file sementara untuk %s: %w", out, err)
+		return 0, 0, 0, fmt.Errorf("create temporary file for %s: %w", out, err)
 	}
 	defer func() { _ = os.Remove(staged) }()
 
@@ -105,10 +105,10 @@ func GeneratePages(build func(rows int) (data.Report, error), out string, target
 		return 0, 0, 0, err
 	}
 	if pages != targetPages {
-		return 0, 0, 0, fmt.Errorf("target %d halaman tidak tercapai (%s berisi %d halaman)", targetPages, out, pages)
+		return 0, 0, 0, fmt.Errorf("target %d pages not reached (%s contains %d pages)", targetPages, out, pages)
 	}
 	if err := commit(staged, out); err != nil {
-		return 0, 0, 0, fmt.Errorf("simpan %s: %w", out, err)
+		return 0, 0, 0, fmt.Errorf("save %s: %w", out, err)
 	}
 	return lo, pages, size, nil
 }

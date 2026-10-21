@@ -23,6 +23,7 @@ func newCommand(t *testing.T, args ...string) *cobra.Command {
 	}
 	flags := cmd.Flags()
 	flags.StringP("type", "t", TypeInvoice, "")
+	flags.String("lang", "en", "")
 	flags.StringP("out", "o", "", "")
 	flags.String("out-dir", DefaultOutDir, "")
 	flags.IntP("rows", "r", 0, "")
@@ -91,14 +92,14 @@ func TestLoadPrecedence(t *testing.T) {
 		},
 		{
 			name:     "file over default",
-			file:     "type: laporan\nrows: 5\nout: from-file.pdf\n",
+			file:     "type: report\nrows: 5\nout: from-file.pdf\n",
 			wantType: TypeReport,
 			wantRows: 5,
 			wantOut:  "from-file.pdf",
 		},
 		{
 			name:     "env over file",
-			file:     "type: laporan\nrows: 5\nout: from-file.pdf\n",
+			file:     "type: report\nrows: 5\nout: from-file.pdf\n",
 			env:      map[string]string{"GENPDF_TYPE": TypeDelivery, "GENPDF_ROWS": "9", "GENPDF_OUT": "from-env.pdf"},
 			wantType: TypeDelivery,
 			wantRows: 9,
@@ -106,7 +107,7 @@ func TestLoadPrecedence(t *testing.T) {
 		},
 		{
 			name:     "flag over env",
-			file:     "type: laporan\nrows: 5\nout: from-file.pdf\n",
+			file:     "type: report\nrows: 5\nout: from-file.pdf\n",
 			env:      map[string]string{"GENPDF_TYPE": TypeDelivery, "GENPDF_ROWS": "9", "GENPDF_OUT": "from-env.pdf"},
 			args:     []string{"--type", TypeCertificate, "--rows", "3", "--out", "from-flag.pdf"},
 			wantType: TypeCertificate,
@@ -146,11 +147,11 @@ func TestLoadDefaultsPerType(t *testing.T) {
 		wantTitle string
 	}{
 		{typ: TypeInvoice, wantRows: 8, wantTitle: "Invoice"},
-		{typ: TypeLetter, wantRows: 0, wantTitle: "Surat Resmi"},
-		{typ: TypeReport, wantRows: 70, wantTitle: "Laporan"},
-		{typ: TypeReceipt, wantRows: 0, wantTitle: "Kuitansi"},
-		{typ: TypeDelivery, wantRows: 25, wantTitle: "Surat Jalan"},
-		{typ: TypeCertificate, wantRows: 0, wantTitle: "Sertifikat"},
+		{typ: TypeLetter, wantRows: 0, wantTitle: "Letter"},
+		{typ: TypeReport, wantRows: 70, wantTitle: "Report"},
+		{typ: TypeReceipt, wantRows: 0, wantTitle: "Receipt"},
+		{typ: TypeDelivery, wantRows: 25, wantTitle: "Delivery Note"},
+		{typ: TypeCertificate, wantRows: 0, wantTitle: "Certificate"},
 	}
 
 	for _, tc := range tests {
@@ -192,7 +193,7 @@ func TestProvidedConfigFlag(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	path := filepath.Join(dir, "custom.yaml")
-	require.NoError(t, os.WriteFile(path, []byte("type: kuitansi\n"), 0o644))
+	require.NoError(t, os.WriteFile(path, []byte("type: receipt\n"), 0o644))
 
 	cfg, err := Load(newCommand(t, "--config", path))
 	require.NoError(t, err)
@@ -208,7 +209,7 @@ func TestLoadConfigPathFromEnv(t *testing.T) {
 	t.Chdir(dir)
 
 	envPath := filepath.Join(dir, "from-env.yaml")
-	require.NoError(t, os.WriteFile(envPath, []byte("type: kuitansi\n"), 0o644))
+	require.NoError(t, os.WriteFile(envPath, []byte("type: receipt\n"), 0o644))
 	t.Setenv("GENPDF_CONFIG", envPath)
 
 	cfg, err := Load(newCommand(t))
@@ -217,7 +218,7 @@ func TestLoadConfigPathFromEnv(t *testing.T) {
 	assert.Equal(t, TypeReceipt, cfg.Type)
 
 	flagPath := filepath.Join(dir, "from-flag.yaml")
-	require.NoError(t, os.WriteFile(flagPath, []byte("type: laporan\n"), 0o644))
+	require.NoError(t, os.WriteFile(flagPath, []byte("type: report\n"), 0o644))
 
 	cfg, err = Load(newCommand(t, "--config", flagPath))
 	require.NoError(t, err)
@@ -267,7 +268,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "zero seed is allowed",
-			cfg:  Config{Type: TypeReceipt, Out: "kuitansi-0.pdf", Seed: 0},
+			cfg:  Config{Type: TypeReceipt, Out: "receipt-0.pdf", Seed: 0},
 		},
 	}
 
@@ -290,6 +291,39 @@ func TestValidateAcceptsEveryType(t *testing.T) {
 	for _, typ := range Types() {
 		assert.NoError(t, Validate(Config{Type: typ, Out: typ + "-42.pdf"}), typ)
 	}
+}
+
+func TestLoadLanguage(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	t.Run("flag", func(t *testing.T) {
+		cfg, err := Load(newCommand(t, "--type", TypeReceipt, "--lang", "id"))
+		require.NoError(t, err)
+		assert.Equal(t, "id", cfg.Language)
+		assert.Equal(t, "Kuitansi", cfg.Title)
+	})
+
+	t.Run("env", func(t *testing.T) {
+		t.Setenv("GENPDF_LANG", "id")
+		cfg, err := Load(newCommand(t, "--type", TypeReceipt))
+		require.NoError(t, err)
+		assert.Equal(t, "id", cfg.Language)
+		assert.Equal(t, "Kuitansi", cfg.Title)
+	})
+
+	t.Run("file", func(t *testing.T) {
+		writeConfigFile(t, ".", "lang: id\n")
+		cfg, err := Load(newCommand(t, "--type", TypeReceipt))
+		require.NoError(t, err)
+		assert.Equal(t, "id", cfg.Language)
+		assert.Equal(t, "Kuitansi", cfg.Title)
+	})
+}
+
+func TestValidateRejectsUnknownLanguage(t *testing.T) {
+	err := Validate(Config{Type: TypeInvoice, Language: "fr", Out: "invoice.pdf"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Language")
 }
 
 // requireDefaultName checks the <type>_<UTC>_<uuid v7>.pdf default name.

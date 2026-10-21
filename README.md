@@ -4,24 +4,27 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go 1.26.10](https://img.shields.io/badge/go-1.26.10-00ADD8?logo=go)](go.mod)
 
-`pdfgen` is a small CLI that generates realistic **dummy PDFs** for six common
-Indonesian office documents: invoices, formal letters, reports, receipts, delivery
-notes, and certificates.
+`pdfgen` is a small CLI and Go library that generates realistic **dummy PDFs** for six
+common office documents: invoices, formal letters, reports, receipts, delivery notes,
+and certificates.
 
 All data is fictional, every output is a valid PDF, and document content is
 reproducible from a seed. Use it for demos, test fixtures, layout checks, or filling
 a staging folder without touching real customer data.
 
+Output is English by default and Indonesian with `--lang id`; type slugs and file
+names stay English in both languages.
+
 [Versi bahasa Indonesia](README.id.md)
 
 ## Status
 
-Early development (`v0.1.x`). The CLI and manifest format may change in minor
+Early development (`v0.2.x`). The CLI and manifest format may change in minor
 releases; pin a release if you need a stable interface. The project is maintained
 by one person on a best-effort basis.
 
-CLI messages are in Indonesian; the documentation is English with an Indonesian
-translation.
+CLI messages, errors, and flag descriptions are in English. Runtime output and PDF
+content are localized; the documentation is English with an Indonesian translation.
 
 ![Invoice example](assets/preview.png)
 
@@ -34,8 +37,10 @@ latest release is supported, as described in [SECURITY.md](SECURITY.md).
 ## Features
 
 - Six document types with layouts that look like real office paperwork.
+- English and Indonesian output: `--lang en` (default) or `--lang id`.
 - Three ways to work: one interactive form, flag-driven single files, or a YAML
   manifest that generates many files in one run.
+- A thin Go library API (`pdfgen.Render`, `pdfgen.Generate`) for the same documents.
 - Exact page targets for table-based documents: content is sized to fill the
   requested number of pages.
 - Deterministic content from a seed, with unique file names so runs never collide.
@@ -100,23 +105,35 @@ output/invoice_20261021T141530Z_0192f3a4-5b6c-7d8e-9f00-112233445566.pdf
 
 ## Document types
 
-| `--type` | Default `--rows` | Default `--title` | Content |
+| `--type` | Default `--rows` | Default `--title` (`en` / `id`) | Content |
 |---|---|---|---|
-| `invoice` | 8 | Invoice | Letterhead, seller/buyer, item table, subtotal/VAT 11%/total, signature |
-| `surat-resmi` | 0 (no table) | Surat Resmi | Letterhead, number, subject, recipient, three paragraphs, signature |
-| `laporan` | 70 | Laporan | Two paragraphs and a table that flows across pages |
-| `kuitansi` | 0 (no table) | Kuitansi | Framed box, amount in digits and words, signature |
-| `surat-jalan` | 25 | Surat Jalan | Recipient, item table, sender and receiver signatures |
-| `sertifikat` | 0 (no table) | Sertifikat | Landscape, large name, award paragraph, verification QR |
+| `invoice` | 8 | Invoice / Invoice | Letterhead, seller/buyer, item table, subtotal/VAT 11%/total, signature |
+| `letter` | 0 (no table) | Letter / Surat Resmi | Letterhead, number, subject, recipient, three paragraphs, signature |
+| `report` | 70 | Report / Laporan | Two paragraphs and a table that flows across pages |
+| `receipt` | 0 (no table) | Receipt / Kuitansi | Framed box, amount in digits and words, signature |
+| `delivery-note` | 25 | Delivery Note / Surat Jalan | Recipient, item table, sender and receiver signatures |
+| `certificate` | 0 (no table) | Certificate / Sertifikat | Landscape, large name, award paragraph, verification QR |
 
-`--rows` only affects `invoice`, `laporan`, and `surat-jalan`; it is ignored for the
+`--rows` only affects `invoice`, `report`, and `delivery-note`; it is ignored for the
 other types.
+
+## Languages
+
+`--lang` (or `GENPDF_LANG`, or `lang` in the config file) selects the locale:
+
+| Value | Data | Money | Dates | Amount in words |
+|---|---|---|---|---|
+| `en` (default) | International ASCII names and addresses | `$1,234.56` | `02 January 2006` | `one thousand two hundred thirty-four dollars` |
+| `id` | Indonesian names and addresses | `Rp1.234.567` | `02 Januari 2006` | `satu juta dua ratus tiga puluh empat ribu rupiah` |
+
+The locale is never detected from `LANG`; the default is always `en`. An unknown
+value is a configuration error. Document slugs, file names, help text, and errors
+stay English regardless of `--lang`.
 
 ## Known limitations
 
-- Data, currency, and document conventions are Indonesian only.
-- `surat-resmi`, `kuitansi`, and `sertifikat` are always one page. Exact page
-  targets are available only for table documents, and only in batch mode.
+- Two locales only: English and Indonesian. There is no auto-detection and no custom
+  translation.
 - Layouts are fixed. There are no custom templates, logos, fonts, PDF encryption,
   or digital signatures.
 - The page-target search is capped at 2000 table rows; larger targets fail instead
@@ -131,7 +148,8 @@ other types.
 
 | Flag | Default | Description |
 |---|---|---|
-| `-t, --type` | `invoice` | Document type: `invoice`, `surat-resmi`, `laporan`, `kuitansi`, `surat-jalan`, `sertifikat` |
+| `-t, --type` | `invoice` | Document type: `invoice`, `letter`, `report`, `receipt`, `delivery-note`, `certificate` |
+| `--lang` | `en` | Output language: `en` or `id` |
 | `-o, --out` | `<out-dir>/<type>_<UTC>_<uuid v7>.pdf` | Exact output path |
 | `--out-dir` | `output` | Base folder for default names and relative paths; created automatically |
 | `-r, --rows` | `-1` (per-type default) | Table rows in single-file mode; ignored for non-table types |
@@ -172,10 +190,10 @@ Notes:
 
 ```bash
 pdfgen --no-input
-pdfgen -t laporan -s 7 --no-input --verify
-pdfgen -t sertifikat --title "Sertifikat Pelatihan" --no-input
-pdfgen -t kuitansi --out output/kuitansi.pdf
-pdfgen -t laporan --out-dir hasil --no-input
+pdfgen -t report -s 7 --no-input --verify
+pdfgen -t certificate --title "Training Certificate" --no-input
+pdfgen -t receipt --out output/receipt.pdf
+pdfgen -t report --lang id --out-dir hasil --no-input
 ```
 
 `--rows` controls the table size in this mode. There is no exact-page option; use the
@@ -199,6 +217,35 @@ When stdin is not a terminal (pipes, CI), `pdfgen` automatically uses single-fil
 non-interactive mode. Output folders are created automatically; existing files are
 only replaced with `--force`.
 
+## Library
+
+The module root is a thin Go API over the same renderer:
+
+```go
+import "github.com/ardizariat/generate-pdf"
+
+res, err := pdfgen.Generate("out/report.pdf", pdfgen.Options{
+	Type:     "report",
+	Language: "id",       // "" = en
+	Rows:     40,         // -1 = per-type default
+	Seed:     7,
+})
+if err != nil {
+	return err
+}
+fmt.Println(res.Pages, res.Bytes)
+```
+
+`Render(w io.Writer, opts Options)` writes to any writer instead of a file. `Options`
+defaults: empty `Type` is `invoice`, empty `Language` is `en`, empty `Title` is the
+localized type title, and `Rows: -1` uses the per-type default. `Seed: 0` is still
+deterministic (unlike the CLI, where `0` means random). `Generate` refuses to replace
+an existing file unless `Force` is set. Errors can be matched with
+`errors.Is(err, pdfgen.ErrInvalidOptions)`, `ErrUnsupportedType`, or `ErrOutputExists`.
+
+Internal packages remain `internal/`; the public surface is `Options`, `Result`,
+`Render`, `Generate`, and the sentinel errors. There is no context or batch API.
+
 ## Configuration
 
 Priority, highest first:
@@ -219,21 +266,23 @@ configuration file. Keys match the flag names:
 
 ```yaml
 # generate-pdf.yaml
-type: laporan
+type: report
 rows: 20
+lang: id
 seed: 7
 out-dir: hasil
 verify: true
 ```
 
 Environment variables use the `GENPDF_` prefix with `-` replaced by `_`:
-`GENPDF_TYPE`, `GENPDF_OUT`, `GENPDF_OUT_DIR`, `GENPDF_ROWS`, `GENPDF_SEED`,
+`GENPDF_TYPE`, `GENPDF_LANG`, `GENPDF_OUT`, `GENPDF_OUT_DIR`, `GENPDF_ROWS`, `GENPDF_SEED`,
 `GENPDF_TITLE`, `GENPDF_BATCH`, `GENPDF_NO_INPUT`, `GENPDF_FORCE`, `GENPDF_VERIFY`,
 `GENPDF_VERBOSE`, `GENPDF_CONFIG`.
 
 Configuration is validated after merging all sources and again after the interactive
-form: `type` must be one of the supported types and `rows` must be `0` or greater.
-When `--out` is omitted, the path is built from `--out-dir` with an automatic name.
+form: `type` must be one of the supported types, `lang` must be `en` or `id`, and
+`rows` must be `0` or greater. When `--out` is omitted, the path is built from
+`--out-dir` with an automatic name.
 
 ## Batch and page targets
 
@@ -253,10 +302,10 @@ jobs:
     pages: 2            # this PDF must be exactly 2 pages
     seed: 7             # content seed; same seed = same content
     out: invoice-a.pdf  # relative to <out-dir>/invoice-a.pdf
-  - type: laporan
+  - type: report
     pages: 3
     seed: 8             # no out -> automatic unique name
-  - type: surat-jalan   # no table, must be 1 page
+  - type: delivery-note # no table, must be 1 page
 ```
 
 Run it with:
@@ -280,8 +329,8 @@ pdfgen --batch jobs.yaml --no-input
 - **`pages` must be exact.** For table documents, the program fills as many table
   rows as fit the requested page count, then measures the page count with `pdfcpu`.
   If the target cannot be met, that job fails.
-- **More than one page is only supported for table documents**: `invoice`, `laporan`,
-  and `surat-jalan`. `surat-resmi`, `kuitansi`, and `sertifikat` always use one page.
+- **More than one page is only supported for table documents**: `invoice`, `report`,
+  and `delivery-note`. `letter`, `receipt`, and `certificate` always use one page.
 - **`--rows` is not used in batch mode.** `pages` controls how much table content is
   generated.
 - **All entries are validated before any file is written.** One invalid entry stops
@@ -301,12 +350,12 @@ pdfgen --batch jobs.yaml --no-input
 ### Reading the result
 
 While jobs run, progress is written to stderr (a spinner such as
-`[2/3] file.pdf · target 2 halaman` in a terminal, or one line per update otherwise).
+`[2/3] file.pdf · target 2 pages` in a terminal, or one line per update otherwise).
 Afterwards, stdout contains one summary line per file:
 
 ```
-ok     output/laporan_20261021T141530Z_0192f3a4-....pdf  3 halaman  178697 bytes
-ringkasan: 3 sukses, 0 gagal
+ok     output/report_20261021T141530Z_0192f3a4-....pdf  3 pages  178697 bytes
+summary: 3 succeeded, 0 failed
 ```
 
 `-v` disables the progress display because zap logs already show each stage.
@@ -351,11 +400,11 @@ Sample outputs generated with fixed seeds:
 | Document | File |
 |---|---|
 | Invoice | [examples/invoice.pdf](examples/invoice.pdf) |
-| Formal letter | [examples/surat-resmi.pdf](examples/surat-resmi.pdf) |
-| Report | [examples/laporan.pdf](examples/laporan.pdf) |
-| Receipt | [examples/kuitansi.pdf](examples/kuitansi.pdf) |
-| Delivery note | [examples/surat-jalan.pdf](examples/surat-jalan.pdf) |
-| Certificate | [examples/sertifikat.pdf](examples/sertifikat.pdf) |
+| Formal letter | [examples/letter.pdf](examples/letter.pdf) |
+| Report | [examples/report.pdf](examples/report.pdf) |
+| Receipt | [examples/receipt.pdf](examples/receipt.pdf) |
+| Delivery note | [examples/delivery-note.pdf](examples/delivery-note.pdf) |
+| Certificate | [examples/certificate.pdf](examples/certificate.pdf) |
 
 ## Dependencies
 

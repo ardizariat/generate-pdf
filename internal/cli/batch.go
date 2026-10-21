@@ -11,6 +11,7 @@ import (
 
 	"github.com/ardizariat/generate-pdf/internal/config"
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 	"github.com/ardizariat/generate-pdf/internal/report"
 )
 
@@ -22,40 +23,41 @@ func runBatch(cmd *cobra.Command, logger *zap.Logger, cfg config.Config, jobs []
 	}
 
 	out := cmd.OutOrStdout()
+	labels := locale.Get(locale.OrDefault(cfg.Language))
 	failures := 0
 	for i, job := range jobs {
 		start := time.Now()
 		var pages int
 		var size int64
 		var jobErr error
-		progress(cfg, fmt.Sprintf("[%d/%d] %s · target %d halaman", i+1, len(jobs), job.Out, job.Pages), func() {
+		progress(cfg, fmt.Sprintf(labels.ProgressPages, i+1, len(jobs), job.Out, job.Pages), func() {
 			pages, size, jobErr = generateJob(job, cfg)
 		})
 		if jobErr != nil {
 			failures++
-			if _, writeErr := fmt.Fprintf(out, "gagal  %s: %v\n", job.Out, jobErr); writeErr != nil {
-				return fmt.Errorf("tulis ringkasan: %w", writeErr)
+			if _, writeErr := fmt.Fprintf(out, labels.BatchFailed, job.Out, jobErr); writeErr != nil {
+				return fmt.Errorf("write summary: %w", writeErr)
 			}
 			continue
 		}
 
-		logger.Info("generate selesai",
+		logger.Info("generate complete",
 			zap.String("type", job.Type),
 			zap.String("out", job.Out),
 			zap.Int("pages", pages),
 			zap.Int64("bytes", size),
 			zap.Duration("duration", time.Since(start)),
 		)
-		if _, err := fmt.Fprintf(out, "ok     %s  %d halaman  %d bytes\n", job.Out, pages, size); err != nil {
-			return fmt.Errorf("tulis ringkasan: %w", err)
+		if _, err := fmt.Fprintf(out, labels.BatchOK, job.Out, pages, size); err != nil {
+			return fmt.Errorf("write summary: %w", err)
 		}
 	}
 
-	if _, err := fmt.Fprintf(out, "ringkasan: %d sukses, %d gagal\n", len(jobs)-failures, failures); err != nil {
-		return fmt.Errorf("tulis ringkasan: %w", err)
+	if _, err := fmt.Fprintf(out, labels.BatchSummary, len(jobs)-failures, failures); err != nil {
+		return fmt.Errorf("write summary: %w", err)
 	}
 	if failures > 0 {
-		return fmt.Errorf("%d dari %d file gagal", failures, len(jobs))
+		return fmt.Errorf("%d of %d files failed", failures, len(jobs))
 	}
 	return nil
 }
@@ -64,10 +66,10 @@ func runBatch(cmd *cobra.Command, logger *zap.Logger, cfg config.Config, jobs []
 func generateJob(job config.Job, cfg config.Config) (pages int, size int64, err error) {
 	if _, err := os.Stat(job.Out); err == nil {
 		if !cfg.Force {
-			return 0, 0, fmt.Errorf("file %s sudah ada; gunakan --force untuk menimpa", job.Out)
+			return 0, 0, fmt.Errorf("file %s already exists; use --force to overwrite", job.Out)
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return 0, 0, fmt.Errorf("cek %s: %w", job.Out, err)
+		return 0, 0, fmt.Errorf("check %s: %w", job.Out, err)
 	}
 
 	if err := ensureParentDir(job.Out); err != nil {
@@ -75,7 +77,7 @@ func generateJob(job config.Job, cfg config.Config) (pages int, size int64, err 
 	}
 
 	build := func(rows int) (data.Report, error) {
-		r, err := data.Generate(job.Type, rows, job.Seed)
+		r, err := data.Generate(job.Type, rows, job.Seed, locale.OrDefault(cfg.Language))
 		if err != nil {
 			return data.Report{}, err
 		}
@@ -85,7 +87,7 @@ func generateJob(job config.Job, cfg config.Config) (pages int, size int64, err 
 
 	_, pages, size, err = report.GeneratePages(build, job.Out, job.Pages, cfg.Verify)
 	if err != nil {
-		return 0, 0, fmt.Errorf("buat pdf %s: %w", job.Out, err)
+		return 0, 0, fmt.Errorf("build pdf %s: %w", job.Out, err)
 	}
 	return pages, size, nil
 }

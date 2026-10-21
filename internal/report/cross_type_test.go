@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 // TestCrossTypeGenerate exercises dispatch, writing, and verification for every
@@ -20,16 +21,16 @@ func TestCrossTypeGenerate(t *testing.T) {
 		maxPages int // 0 = no upper bound
 	}{
 		{docType: "invoice", rows: 8, minPages: 1, maxPages: 1},
-		{docType: "surat-resmi", rows: 0, minPages: 1, maxPages: 1},
-		{docType: "laporan", rows: 70, minPages: 3},
-		{docType: "kuitansi", rows: 0, minPages: 1, maxPages: 1},
-		{docType: "surat-jalan", rows: 25, minPages: 1, maxPages: 1},
-		{docType: "sertifikat", rows: 0, minPages: 1, maxPages: 1},
+		{docType: "letter", rows: 0, minPages: 1, maxPages: 1},
+		{docType: "report", rows: 70, minPages: 3},
+		{docType: "receipt", rows: 0, minPages: 1, maxPages: 1},
+		{docType: "delivery-note", rows: 25, minPages: 1, maxPages: 1},
+		{docType: "certificate", rows: 0, minPages: 1, maxPages: 1},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.docType, func(t *testing.T) {
-			r, err := data.Generate(tt.docType, tt.rows, 42)
+			r, err := data.Generate(tt.docType, tt.rows, 42, locale.English)
 			require.NoError(t, err)
 
 			path := filepath.Join(t.TempDir(), tt.docType+".pdf")

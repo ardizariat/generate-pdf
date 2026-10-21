@@ -3,12 +3,15 @@ package cli
 
 import (
 	"fmt"
+	"runtime/debug"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/ardizariat/generate-pdf/internal/config"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 const (
@@ -19,22 +22,12 @@ const (
 // version is set at build time by goreleaser; "dev" for local builds.
 var version = "dev"
 
-// typeDescriptions is read-only: short description per document type for `types`.
-var typeDescriptions = map[string]string{
-	config.TypeInvoice:     "Invoice penjualan dengan tabel barang dan PPN",
-	config.TypeLetter:      "Surat resmi dengan kop dan tanda tangan",
-	config.TypeReport:      "Laporan tabel yang mengalir multi-halaman",
-	config.TypeReceipt:     "Kuitansi pembayaran dengan nominal terbilang",
-	config.TypeDelivery:    "Surat jalan pengiriman dengan dua tanda tangan",
-	config.TypeCertificate: "Sertifikat landscape dengan QR verifikasi",
-}
-
 // New returns the pdfgen root command. It never prints errors or usage itself.
 func New(logger *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "pdfgen",
-		Short:         "Generate PDF dokumen dummy Indonesia",
-		Version:       version,
+		Short:         "Generate dummy office PDF documents",
+		Version:       effectiveVersion(),
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -42,37 +35,57 @@ func New(logger *zap.Logger) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("type", "t", config.TypeInvoice, "jenis dokumen: invoice, surat-resmi, laporan, kuitansi, surat-jalan, sertifikat")
-	cmd.Flags().StringP("out", "o", "", "path output PDF (default <out-dir>/<type>_<waktu UTC>_<uuid v7>.pdf)")
-	cmd.Flags().String("out-dir", config.DefaultOutDir, "folder dasar output; dibuat otomatis bila belum ada")
-	cmd.Flags().IntP("rows", "r", defaultRows, "jumlah baris tabel (-1 = default per jenis)")
-	cmd.Flags().Uint64P("seed", "s", defaultSeed, "seed data; 0 berarti acak")
-	cmd.Flags().String("title", "", "judul dokumen (default per jenis)")
-	cmd.Flags().String("batch", "", "path manifest YAML berisi daftar job")
-	cmd.Flags().Bool("no-input", false, "matikan prompt interaktif")
-	cmd.Flags().Bool("force", false, "izinkan menimpa file output yang sudah ada")
-	cmd.Flags().Bool("verify", false, "validasi PDF dengan pdfcpu setelah ditulis")
-	cmd.Flags().BoolP("verbose", "v", false, "log level info (default warn)")
-	cmd.Flags().String("config", "", "path file konfigurasi eksplisit")
+	cmd.Flags().StringP("type", "t", config.TypeInvoice, "document type: invoice, letter, report, receipt, delivery-note, certificate")
+	cmd.PersistentFlags().String("lang", string(locale.English), "output language: en or id")
+	cmd.Flags().StringP("out", "o", "", "output PDF path (default <out-dir>/<type>_<UTC time>_<uuid v7>.pdf)")
+	cmd.Flags().String("out-dir", config.DefaultOutDir, "base output directory; created automatically when missing")
+	cmd.Flags().IntP("rows", "r", defaultRows, "table row count (-1 = per-type default)")
+	cmd.Flags().Uint64P("seed", "s", defaultSeed, "data seed; the same seed produces identical output")
+	cmd.Flags().String("title", "", "document title (default per type and language)")
+	cmd.Flags().String("batch", "", "path to a YAML job manifest")
+	cmd.Flags().Bool("no-input", false, "disable the interactive prompt")
+	cmd.Flags().Bool("force", false, "allow overwriting an existing output file")
+	cmd.Flags().Bool("verify", false, "validate the PDF with pdfcpu after writing")
+	cmd.Flags().BoolP("verbose", "v", false, "info-level logging (default warn)")
+	cmd.Flags().String("config", "", "explicit configuration file path")
 
 	cmd.AddCommand(newTypesCommand())
 	return cmd
 }
 
-// newTypesCommand prints the supported document types; it does not load config.
+// effectiveVersion prefers the goreleaser ldflag, then the module version that
+// go install records in build info.
+func effectiveVersion() string {
+	if version != "dev" {
+		return strings.TrimPrefix(version, "v")
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info.Main.Version == "" || info.Main.Version == "(devel)" {
+		return version
+	}
+	return strings.TrimPrefix(info.Main.Version, "v")
+}
+
+// newTypesCommand prints the supported document types in the configured language.
 func newTypesCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "types",
-		Short: "Tampilkan jenis dokumen yang didukung",
+		Short: "Show the supported document types",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			lang := locale.English
+			if cfg, err := config.Load(cmd); err == nil {
+				lang = locale.OrDefault(cfg.Language)
+			}
+			labels := locale.Get(lang)
+
 			name := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#5fafff"))
 			desc := lipgloss.NewStyle().Faint(true)
 
 			out := cmd.OutOrStdout()
 			for _, docType := range config.Types() {
-				if _, err := fmt.Fprintf(out, "%s  %s\n", name.Render(docType), desc.Render(typeDescriptions[docType])); err != nil {
-					return fmt.Errorf("tulis %s: %w", docType, err)
+				if _, err := fmt.Fprintf(out, "%s  %s\n", name.Render(docType), desc.Render(labels.TypeDescriptions[docType])); err != nil {
+					return fmt.Errorf("write %s: %w", docType, err)
 				}
 			}
 			return nil

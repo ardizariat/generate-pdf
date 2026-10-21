@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ardizariat/generate-pdf/internal/config"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 // loadConfig builds a Config from the same flags package cli registers.
@@ -24,6 +25,7 @@ func loadConfig(t *testing.T, args ...string) config.Config {
 	cmd := &cobra.Command{Use: "pdfgen"}
 	flags := cmd.Flags()
 	flags.StringP("type", "t", config.TypeInvoice, "")
+	flags.String("lang", "en", "")
 	flags.StringP("out", "o", "", "")
 	flags.String("out-dir", config.DefaultOutDir, "")
 	flags.IntP("rows", "r", 0, "")
@@ -55,7 +57,7 @@ func TestBuildJobsCyclesTypes(t *testing.T) {
 	requireDefaultName(t, jobs[0].Out, "output", config.TypeInvoice)
 
 	assert.Equal(t, config.TypeReport, jobs[1].Type)
-	assert.Equal(t, "Laporan", jobs[1].Title)
+	assert.Equal(t, "Report", jobs[1].Title)
 	requireDefaultName(t, jobs[1].Out, "output", config.TypeReport)
 
 	assert.Equal(t, config.TypeInvoice, jobs[2].Type)
@@ -86,24 +88,24 @@ func TestBuildJobsRejectsEmptySelection(t *testing.T) {
 
 	_, err := buildJobs(base, nil, 1, 1)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "minimal satu jenis")
+	assert.Contains(t, err.Error(), "select at least one document type")
 
 	_, err = buildJobs(base, []string{config.TypeInvoice}, 0, 1)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "minimal satu file")
+	assert.Contains(t, err.Error(), "at least one file is required")
 }
 
 func TestFillBatchRequiresTerminal(t *testing.T) {
 	cfg := loadConfig(t, "--no-input")
 	_, err := FillBatch(cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "terminal interaktif")
+	assert.Contains(t, err.Error(), "interactive terminal")
 }
 
 func TestMapAbort(t *testing.T) {
 	aborted := mapAbort(huh.ErrUserAborted)
 	require.Error(t, aborted)
-	assert.Contains(t, aborted.Error(), "dibatalkan")
+	assert.Contains(t, aborted.Error(), "aborted")
 	assert.ErrorIs(t, aborted, huh.ErrUserAborted)
 
 	wrapped := mapAbort(fmt.Errorf("run form: %w", huh.ErrUserAborted))
@@ -116,22 +118,23 @@ func TestMapAbort(t *testing.T) {
 }
 
 func TestValidateInput(t *testing.T) {
+	labels := locale.Get(locale.English)
 	for _, value := range []string{"1", "2", "10"} {
-		assert.NoError(t, validateCount(value), value)
+		assert.NoError(t, validateCount(value, labels), value)
 	}
 	for _, value := range []string{"", "0", "-1", "abc"} {
-		assert.Error(t, validateCount(value), value)
+		assert.Error(t, validateCount(value, labels), value)
 	}
 
 	for _, value := range []string{"1", "3"} {
-		assert.NoError(t, validatePages(value), value)
+		assert.NoError(t, validatePages(value, labels), value)
 	}
 	for _, value := range []string{"", "0", "-1", "abc"} {
-		assert.Error(t, validatePages(value), value)
+		assert.Error(t, validatePages(value, labels), value)
 	}
 
-	assert.NoError(t, validateTypes([]string{config.TypeInvoice}))
-	assert.Error(t, validateTypes(nil))
+	assert.NoError(t, validateTypes([]string{config.TypeInvoice}, labels))
+	assert.Error(t, validateTypes(nil, labels))
 }
 
 func TestPipeStdinIsNotInteractive(t *testing.T) {

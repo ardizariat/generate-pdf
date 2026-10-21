@@ -2,13 +2,14 @@ package data
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 // Party is a party involved in a document.
@@ -59,6 +60,7 @@ type ReportRow struct {
 type Report struct {
 	Type          string
 	Title         string
+	Language      locale.Language
 	DocID         string
 	Number        string
 	Date          time.Time
@@ -75,31 +77,10 @@ type Report struct {
 	Paragraphs    []string
 }
 
-// typeTitles is read-only: default title per document type.
-var typeTitles = map[string]string{
-	"invoice":     "Invoice",
-	"surat-resmi": "Surat Resmi",
-	"laporan":     "Laporan",
-	"kuitansi":    "Kuitansi",
-	"surat-jalan": "Surat Jalan",
-	"sertifikat":  "Sertifikat",
-}
-
-// proseSentences is read-only: filler sentences for paragraphs.
-var proseSentences = [...]string{
-	"Informasi pada dokumen ini disusun secara ringkas dan mudah dibaca.",
-	"Setiap bagian disusun agar dapat dipakai sebagai contoh format resmi.",
-	"Nomor dan tanggal dokumen dihasilkan secara konsisten dari nilai seed.",
-	"Isi dokumen dapat digunakan untuk pengujian tampilan dan tata letak.",
-	"Penggunaan nama dan alamat di sini hanya untuk ilustrasi.",
-	"Struktur dokumen mengikuti kebiasaan surat-menyurat di Indonesia.",
-	"Bagian penutup dilengkapi ruang tanda tangan sebagaimana lazimnya.",
-	"Format nominal mengikuti gaya penulisan rupiah yang berlaku.",
-}
-
-// Generate builds the document payload deterministically from type, row count, and seed.
-func Generate(docType string, rows int, seed uint64) (Report, error) {
-	title, ok := typeTitles[docType]
+// Generate builds the document payload deterministically from type, row count,
+// seed, and language.
+func Generate(docType string, rows int, seed uint64, lang locale.Language) (Report, error) {
+	title, ok := locale.Get(lang).TypeTitles[docType]
 	if !ok {
 		return Report{}, fmt.Errorf("unknown document type: %q", docType)
 	}
@@ -107,63 +88,64 @@ func Generate(docType string, rows int, seed uint64) (Report, error) {
 		rows = 0
 	}
 
+	ds := dataFor(lang)
 	faker := gofakeit.New(seed)
 	date := time.Unix(int64(seed), 0).UTC()
 
 	report := Report{
 		Type:       docType,
 		Title:      title,
+		Language:   lang,
 		DocID:      uuid.NewSHA1(uuid.NameSpaceOID, []byte(fmt.Sprintf("%s-%d", docType, seed))).String(),
 		Number:     fmt.Sprintf("%03d/GENPDF/%d", faker.IntRange(1, 999), date.Year()),
 		Date:       date,
 		Seed:       seed,
 		Rows:       rows,
-		From:       newParty(faker),
-		To:         newParty(faker),
-		Purpose:    faker.RandomString(purposes[:]),
-		Paragraphs: newParagraphs(faker, title),
+		From:       newParty(faker, ds),
+		To:         newParty(faker, ds),
+		Purpose:    faker.RandomString(ds.purposes),
+		Paragraphs: newParagraphs(faker, title, ds),
 	}
 
 	switch docType {
 	case "invoice":
-		report.InvoiceItems, report.InvoiceTotals = newInvoice(faker, rows)
-	case "surat-jalan":
-		report.DeliveryItems = newDeliveryItems(faker, rows)
-	case "laporan":
-		report.ReportRows = newReportRows(faker, rows, date)
-	case "kuitansi":
-		report.Amount = decimal.NewFromInt(int64(faker.IntRange(100, 50_000) * 1000))
+		report.InvoiceItems, report.InvoiceTotals = newInvoice(faker, rows, ds)
+	case "delivery-note":
+		report.DeliveryItems = newDeliveryItems(faker, rows, ds)
+	case "report":
+		report.ReportRows = newReportRows(faker, rows, date, ds)
+	case "receipt":
+		report.Amount = ds.receipt.fake(faker)
 	}
 
 	return report, nil
 }
 
-func newParty(faker *gofakeit.Faker) Party {
-	name := faker.RandomString(firstNames[:]) + " " + faker.RandomString(lastNames[:])
-	city := faker.RandomString(cities[:])
+func newParty(faker *gofakeit.Faker, ds dataset) Party {
+	name := faker.RandomString(ds.firstNames) + " " + faker.RandomString(ds.lastNames)
 
 	return Party{
 		Name:     name,
-		Company:  faker.RandomString(companies[:]),
-		Address:  faker.RandomString(streets[:]) + " No. " + strconv.Itoa(faker.IntRange(1, 200)),
-		City:     city,
+		Company:  faker.RandomString(ds.companies),
+		Address:  ds.address(faker),
+		City:     faker.RandomString(ds.cities),
 		Email:    strings.ToLower(strings.ReplaceAll(name, " ", ".")) + "@example.com",
-		Phone:    faker.Numerify("08##########"),
-		Position: faker.RandomString(positions[:]),
+		Phone:    faker.Numerify(ds.phonePattern),
+		Position: faker.RandomString(ds.positions),
 	}
 }
 
-func newInvoice(faker *gofakeit.Faker, rows int) ([]InvoiceItem, InvoiceTotals) {
+func newInvoice(faker *gofakeit.Faker, rows int, ds dataset) ([]InvoiceItem, InvoiceTotals) {
 	items := make([]InvoiceItem, 0, rows)
 	subtotal := decimal.Zero
 
 	for i := 0; i < rows; i++ {
 		qty := faker.IntRange(1, 10)
-		price := decimal.NewFromInt(int64(faker.IntRange(10_000, 500_000)))
+		price := ds.price.fake(faker)
 		line := price.Mul(decimal.NewFromInt(int64(qty)))
 
 		items = append(items, InvoiceItem{
-			Name:     faker.RandomString(goods[:]),
+			Name:     faker.RandomString(ds.goods),
 			Qty:      qty,
 			Price:    price,
 			Subtotal: line,
@@ -175,42 +157,41 @@ func newInvoice(faker *gofakeit.Faker, rows int) ([]InvoiceItem, InvoiceTotals) 
 	return items, InvoiceTotals{Subtotal: subtotal, Tax: tax, Total: subtotal.Add(tax)}
 }
 
-func newDeliveryItems(faker *gofakeit.Faker, rows int) []DeliveryItem {
+func newDeliveryItems(faker *gofakeit.Faker, rows int, ds dataset) []DeliveryItem {
 	items := make([]DeliveryItem, 0, rows)
 	for i := 0; i < rows; i++ {
 		items = append(items, DeliveryItem{
-			Name: faker.RandomString(goods[:]),
+			Name: faker.RandomString(ds.goods),
 			Qty:  faker.IntRange(1, 20),
-			Unit: faker.RandomString(units[:]),
-			Note: faker.RandomString(deliveryNotes[:]),
+			Unit: faker.RandomString(ds.units),
+			Note: faker.RandomString(ds.deliveryNotes),
 		})
 	}
 	return items
 }
 
-func newReportRows(faker *gofakeit.Faker, rows int, date time.Time) []ReportRow {
+func newReportRows(faker *gofakeit.Faker, rows int, date time.Time, ds dataset) []ReportRow {
 	result := make([]ReportRow, 0, rows)
 	for i := 0; i < rows; i++ {
-		name := faker.RandomString(firstNames[:]) + " " + faker.RandomString(lastNames[:])
+		name := faker.RandomString(ds.firstNames) + " " + faker.RandomString(ds.lastNames)
 		result = append(result, ReportRow{
 			No:    i + 1,
 			Name:  name,
-			City:  faker.RandomString(cities[:]),
+			City:  faker.RandomString(ds.cities),
 			Email: strings.ToLower(strings.ReplaceAll(name, " ", ".")) + "@example.com",
-			Value: decimal.NewFromInt(int64(faker.IntRange(100, 10_000) * 1000)),
+			Value: ds.report.fake(faker),
 			Date:  date.AddDate(0, 0, faker.IntRange(0, 365)),
 		})
 	}
 	return result
 }
 
-func newParagraphs(faker *gofakeit.Faker, title string) []string {
-	first := fmt.Sprintf("Dokumen %s ini dihasilkan secara otomatis untuk keperluan contoh dan demonstrasi.", title)
-	last := "Seluruh data fiktif pada dokumen ini tidak merujuk pada orang, perusahaan, atau transaksi nyata."
+func newParagraphs(faker *gofakeit.Faker, title string, ds dataset) []string {
+	first := fmt.Sprintf(ds.intro, title)
 
 	return []string{
-		first + " " + faker.RandomString(proseSentences[:]) + " " + faker.RandomString(proseSentences[:]),
-		faker.RandomString(proseSentences[:]) + " " + faker.RandomString(proseSentences[:]) + " " + faker.RandomString(proseSentences[:]),
-		last + " " + faker.RandomString(proseSentences[:]) + " " + faker.RandomString(proseSentences[:]),
+		first + " " + faker.RandomString(ds.prose) + " " + faker.RandomString(ds.prose),
+		faker.RandomString(ds.prose) + " " + faker.RandomString(ds.prose) + " " + faker.RandomString(ds.prose),
+		ds.fictional + " " + faker.RandomString(ds.prose) + " " + faker.RandomString(ds.prose),
 	}
 }

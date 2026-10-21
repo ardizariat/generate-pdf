@@ -10,10 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ardizariat/generate-pdf/internal/data"
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
 func TestCertificateLayout(t *testing.T) {
-	r, err := data.Generate("sertifikat", 0, 42)
+	r, err := data.Generate("certificate", 0, 42, locale.English)
 	require.NoError(t, err)
 
 	m, err := newDocument(r)
@@ -23,7 +24,7 @@ func TestCertificateLayout(t *testing.T) {
 	doc, err := m.Generate()
 	require.NoError(t, err)
 
-	path := filepath.Join(t.TempDir(), "sertifikat.pdf")
+	path := filepath.Join(t.TempDir(), "certificate.pdf")
 	require.NoError(t, doc.Save(path))
 	require.NoError(t, api.ValidateFile(path, model.NewDefaultConfiguration()))
 

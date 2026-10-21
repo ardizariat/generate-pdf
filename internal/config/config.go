@@ -14,16 +14,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/ardizariat/generate-pdf/internal/locale"
 )
 
-// Supported document types.
+// Supported document types. Slugs stay English in every language.
 const (
 	TypeInvoice     = "invoice"
-	TypeLetter      = "surat-resmi"
-	TypeReport      = "laporan"
-	TypeReceipt     = "kuitansi"
-	TypeDelivery    = "surat-jalan"
-	TypeCertificate = "sertifikat"
+	TypeLetter      = "letter"
+	TypeReport      = "report"
+	TypeReceipt     = "receipt"
+	TypeDelivery    = "delivery-note"
+	TypeCertificate = "certificate"
 )
 
 // typeList is the single source of the type list; also used by the validator tag.
@@ -38,26 +40,30 @@ const (
 const DefaultOutDir = "output"
 
 // configKeys is read-only: viper key = flag name.
-var configKeys = [...]string{"type", "out", "out-dir", "rows", "seed", "title", "batch", "no-input", "force", "verify", "verbose", "config"}
+var configKeys = [...]string{"type", "lang", "out", "out-dir", "rows", "seed", "title", "batch", "no-input", "force", "verify", "verbose", "config"}
 
 type defaults struct {
-	rows  int
-	title string
+	rows int
 }
 
 // typeDefaults is read-only after initialization.
 var typeDefaults = map[string]defaults{
-	TypeInvoice:     {rows: 8, title: "Invoice"},
-	TypeLetter:      {rows: 0, title: "Surat Resmi"},
-	TypeReport:      {rows: 70, title: "Laporan"},
-	TypeReceipt:     {rows: 0, title: "Kuitansi"},
-	TypeDelivery:    {rows: 25, title: "Surat Jalan"},
-	TypeCertificate: {rows: 0, title: "Sertifikat"},
+	TypeInvoice:     {rows: 8},
+	TypeLetter:      {rows: 0},
+	TypeReport:      {rows: 70},
+	TypeReceipt:     {rows: 0},
+	TypeDelivery:    {rows: 25},
+	TypeCertificate: {rows: 0},
 }
 
 // Types returns the supported document types.
 func Types() []string {
 	return strings.Split(typeList, ",")
+}
+
+// DefaultRows returns the default table row count for docType.
+func DefaultRows(docType string) int {
+	return typeDefaults[docType].rows
 }
 
 // OutputPath places a relative path under baseDir. Absolute paths and an empty
@@ -74,14 +80,15 @@ func OutputPath(baseDir, path string) string {
 func DefaultOutputName(docType string, at time.Time) (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
-		return "", fmt.Errorf("buat uuid output: %w", err)
+		return "", fmt.Errorf("create output uuid: %w", err)
 	}
 	return fmt.Sprintf("%s_%s_%s.pdf", docType, at.UTC().Format("20060102T150405Z"), id.String()), nil
 }
 
 // Config is the final configuration after all sources are merged.
 type Config struct {
-	Type       string `validate:"required,oneof=invoice surat-resmi laporan kuitansi surat-jalan sertifikat"`
+	Type       string `validate:"required,oneof=invoice letter report receipt delivery-note certificate"`
+	Language   string `validate:"omitempty,oneof=en id"`
 	Out        string `validate:"required"`
 	OutDir     string
 	Title      string
@@ -127,6 +134,7 @@ func Load(cmd *cobra.Command) (Config, error) {
 
 	loose := Config{
 		Type:       v.GetString("type"),
+		Language:   v.GetString("lang"),
 		Out:        v.GetString("out"),
 		OutDir:     v.GetString("out-dir"),
 		Title:      v.GetString("title"),
@@ -144,16 +152,18 @@ func Load(cmd *cobra.Command) (Config, error) {
 	if loose.Type == "" {
 		loose.Type = TypeInvoice
 	}
+	if loose.Language == "" {
+		loose.Language = string(locale.English)
+	}
 	if loose.OutDir == "" {
 		loose.OutDir = DefaultOutDir
 	}
 
-	defaults := typeDefaults[loose.Type]
 	if !loose.Provided("rows") {
-		loose.Rows = defaults.rows
+		loose.Rows = DefaultRows(loose.Type)
 	}
 	if !loose.Provided("title") {
-		loose.Title = defaults.title
+		loose.Title = locale.Get(locale.OrDefault(loose.Language)).TypeTitles[loose.Type]
 	}
 	if !loose.Provided("out") {
 		name, err := DefaultOutputName(loose.Type, time.Now())
