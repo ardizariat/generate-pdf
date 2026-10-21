@@ -1,6 +1,6 @@
 # 16 — Integrasi, race test, dan Definition of Done
 
-Status: ready-for-agent
+Status: done
 Blocked by: 03, 04, 06, 09, 10, 11, 12, 13, 14, 15
 Type: task
 

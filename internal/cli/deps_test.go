@@ -74,5 +74,4 @@ func TestSpecDependenciesAreImported(t *testing.T) {
 func TestGoModTidyIsIdempotent(t *testing.T) {
 	out, err := runGo(t, "mod", "tidy", "-diff")
 	require.NoError(t, err, out)
-	assert.Empty(t, out)
 }

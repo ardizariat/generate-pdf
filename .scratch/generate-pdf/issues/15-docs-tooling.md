@@ -1,6 +1,6 @@
 # 15 — README, Makefile, lint, gitignore
 
-Status: ready-for-agent
+Status: done
 Blocked by: 01, 03
 Type: task
 
