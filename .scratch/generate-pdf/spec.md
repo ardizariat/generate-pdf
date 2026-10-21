@@ -70,16 +70,17 @@ Presedensi: **flag > env `GENPDF_*` > file config > default**.
 
 ## Interaktif
 
-Aktif bila stdin character device dan `--no-input` false. `huh/v2`:
+Aktif bila stdin character device dan `--no-input` false. `huh/v2`, dua form:
 
-1. Input jumlah file (default 1, minimal 1).
-2. Untuk setiap file, satu form: select jenis, jumlah halaman (default 1), seed, path output.
-3. Ringkasan seluruh job dan konfirmasi sebelum generate.
+1. Jumlah file dan multi-select jenis dokumen (boleh lebih dari satu).
+2. Satu layar berisi jumlah halaman per file.
 
-`--rows` tidak ditanyakan pada mode interaktif; jumlah halaman yang mengatur isi
-tabel. Field yang `Provided` tidak ditanyakan. Pembatalan pengguna dikembalikan
-sebagai error eksplisit ("dibatalkan"), bukan panic. Setelah prompt, validasi batch
-dijalankan ulang.
+Jenis dipakai berputar sesuai urutan pilihan bila file lebih banyak daripada jenis.
+Jenis tanpa tabel selalu 1 halaman. Output, seed, dan judul tidak ditanyakan: output
+`<type>-<index>-<seed>.pdf`, seed dari flag/env/default, judul default per jenis atau
+`--title`. Tidak ada konfirmasi; setelah form selesai batch langsung dijalankan.
+`--rows` dan `--out` tidak dipakai pada mode interaktif. Pembatalan pengguna
+dikembalikan sebagai error eksplisit ("dibatalkan"), bukan panic.
 
 ## Batch dan target halaman
 

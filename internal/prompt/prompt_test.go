@@ -39,38 +39,46 @@ func loadConfig(t *testing.T, args ...string) config.Config {
 	return cfg
 }
 
-func TestBuildJobsDefaults(t *testing.T) {
+func TestBuildJobsCyclesTypes(t *testing.T) {
 	base := loadConfig(t)
-	answers := []jobAnswers{
-		{Type: config.TypeReport, Pages: 2, Seed: 7},
-		{Pages: 1, Seed: 9, Out: "custom.pdf"},
-	}
-
-	jobs, err := buildJobs(base, answers)
+	jobs, err := buildJobs(base, []string{config.TypeInvoice, config.TypeReport}, []int{2, 1, 3})
 	require.NoError(t, err)
-	require.Len(t, jobs, 2)
+	require.Len(t, jobs, 3)
 
-	assert.Equal(t, config.Job{Type: config.TypeReport, Pages: 2, Seed: 7, Out: "laporan-1-7.pdf", Title: "Laporan"}, jobs[0])
-	assert.Equal(t, config.Job{Type: config.TypeInvoice, Pages: 1, Seed: 9, Out: "custom.pdf", Title: "Invoice"}, jobs[1])
+	assert.Equal(t, config.Job{Type: config.TypeInvoice, Pages: 2, Seed: 42, Out: "invoice-1-42.pdf", Title: "Invoice"}, jobs[0])
+	assert.Equal(t, config.Job{Type: config.TypeReport, Pages: 1, Seed: 42, Out: "laporan-2-42.pdf", Title: "Laporan"}, jobs[1])
+	assert.Equal(t, config.Job{Type: config.TypeInvoice, Pages: 3, Seed: 42, Out: "invoice-3-42.pdf", Title: "Invoice"}, jobs[2])
 }
 
-func TestBuildJobsUsesProvidedTitle(t *testing.T) {
-	base := loadConfig(t, "--title", "Judul Khusus")
-	jobs, err := buildJobs(base, []jobAnswers{{Type: config.TypeReceipt, Pages: 1, Seed: 42}})
+func TestBuildJobsForcesSinglePageWithoutTable(t *testing.T) {
+	base := loadConfig(t)
+	jobs, err := buildJobs(base, []string{config.TypeLetter, config.TypeCertificate, config.TypeReceipt}, []int{3, 2, 4})
+	require.NoError(t, err)
+	require.Len(t, jobs, 3)
+	for _, job := range jobs {
+		assert.Equal(t, 1, job.Pages, job.Type)
+	}
+}
+
+func TestBuildJobsUsesProvidedTitleAndSeed(t *testing.T) {
+	base := loadConfig(t, "--title", "Judul Khusus", "--seed", "9")
+	jobs, err := buildJobs(base, []string{config.TypeReceipt}, []int{1})
 	require.NoError(t, err)
 	assert.Equal(t, "Judul Khusus", jobs[0].Title)
+	assert.Equal(t, uint64(9), jobs[0].Seed)
+	assert.Equal(t, "kuitansi-1-9.pdf", jobs[0].Out)
 }
 
-func TestBuildJobsRejectsInvalidBatch(t *testing.T) {
+func TestBuildJobsRejectsEmptySelection(t *testing.T) {
 	base := loadConfig(t)
 
-	_, err := buildJobs(base, []jobAnswers{{Type: config.TypeLetter, Pages: 2, Seed: 42}})
+	_, err := buildJobs(base, nil, []int{1})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "surat-resmi")
+	assert.Contains(t, err.Error(), "minimal satu jenis")
 
-	_, err = buildJobs(base, []jobAnswers{{Type: config.TypeInvoice, Pages: 0, Seed: 42}})
+	_, err = buildJobs(base, []string{config.TypeInvoice}, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Pages=0")
+	assert.Contains(t, err.Error(), "minimal satu file")
 }
 
 func TestFillBatchRequiresTerminal(t *testing.T) {
@@ -110,11 +118,8 @@ func TestValidateInput(t *testing.T) {
 		assert.Error(t, validatePages(value), value)
 	}
 
-	assert.NoError(t, validateSeed("0"))
-	assert.NoError(t, validateSeed("18446744073709551615"))
-	for _, value := range []string{"", "-1", "abc"} {
-		assert.Error(t, validateSeed(value), value)
-	}
+	assert.NoError(t, validateTypes([]string{config.TypeInvoice}))
+	assert.Error(t, validateTypes(nil))
 }
 
 func TestPipeStdinIsNotInteractive(t *testing.T) {
