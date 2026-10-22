@@ -38,7 +38,7 @@ changelog:
   sort: asc
   filters:
     exclude:
-      - "^docs(\(.+\))?:"
-      - "^test(\(.+\))?:"
-      - "^chore(\(.+\))?:"
-      - "^ci(\(.+\))?:"
+      - '^docs(\(.+\))?:'
+      - '^test(\(.+\))?:'
+      - '^chore(\(.+\))?:'
+      - '^ci(\(.+\))?:'
