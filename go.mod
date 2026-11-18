@@ -4,7 +4,7 @@ go 1.26.10
 
 require (
 	charm.land/huh/v2 v2.0.3
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.1
 	github.com/boombuler/barcode v1.1.0
 	github.com/brianvoe/gofakeit/v7 v7.18.0
 	github.com/go-playground/validator/v10 v10.30.5
